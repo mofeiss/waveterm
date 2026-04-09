@@ -6,7 +6,7 @@ import { RpcApi } from "@/app/store/wshclientapi";
 import * as electron from "electron";
 import { fireAndForget } from "../frontend/util/util";
 import { focusedBuilderWindow, getBuilderWindowById } from "./emain-builder";
-import { openBuilderWindow } from "./emain-ipc";
+import { getFocusedWebviewBlockId, openBuilderWindow } from "./emain-ipc";
 import { isDev, unamePlatform } from "./emain-platform";
 import { clearTabCache } from "./emain-tabview";
 import {
@@ -208,7 +208,7 @@ function makeViewMenu(
     const devToolsAccel = unamePlatform === "darwin" ? "Option+Command+I" : "Alt+Shift+I";
     const sendZoomCommand = (_window: electron.BaseWindow, direction: ZoomCommandDirection) => {
         const wc = getWindowWebContents(_window) ?? webContents;
-        wc?.send("zoom-command", direction);
+        wc?.send("zoom-command", direction, getFocusedWebviewBlockId());
     };
     return [
         {

@@ -108,11 +108,11 @@ declare global {
         getUpdaterChannel: () => string; // get-updater-channel
         installAppUpdate: () => void; // install-app-update
         onMenuItemAbout: (callback: () => void) => void; // menu-item-about
-        onZoomCommand: (callback: (direction: ZoomCommandDirection) => void) => void; // zoom-command
+        onZoomCommand: (callback: (direction: ZoomCommandDirection, blockId?: string | null) => void) => void; // zoom-command
         applyWindowZoomCommand: (direction: ZoomCommandDirection) => Promise<void>; // window-zoom-command
         updateWindowControlsOverlay: (rect: Dimensions) => void; // update-window-controls-overlay
         onReinjectKey: (callback: (waveEvent: WaveKeyboardEvent) => void) => void; // reinject-key
-        setWebviewFocus: (focusedId: number) => void; // webview-focus, focusedId is the getWebContentsId of the webview
+        setWebviewFocus: (focusedId: number, blockId?: string | null) => void; // webview-focus, focusedId is the getWebContentsId of the webview
         registerGlobalWebviewKeys: (keys: string[]) => void; // register-global-webview-keys
         onControlShiftStateUpdate: (callback: (state: boolean) => void) => void; // control-shift-state-update
         createWorkspace: () => void; // create-workspace

@@ -490,7 +490,10 @@ function tryReinjectKey(event: WaveKeyboardEvent): boolean {
     return appHandleKeyDown(event);
 }
 
-function getZoomTargetBlockId(): string | null {
+function getZoomTargetBlockId(explicitBlockId?: string | null): string | null {
+    if (explicitBlockId != null) {
+        return explicitBlockId;
+    }
     const activeZoomBlockId = globalStore.get(activeZoomBlockIdAtom);
     if (activeZoomBlockId != null) {
         return activeZoomBlockId;
@@ -502,8 +505,8 @@ function getZoomTargetBlockId(): string | null {
     return null;
 }
 
-async function handleZoomCommand(direction: ZoomCommandDirection): Promise<void> {
-    const blockId = getZoomTargetBlockId();
+async function handleZoomCommand(direction: ZoomCommandDirection, explicitBlockId?: string | null): Promise<void> {
+    const blockId = getZoomTargetBlockId(explicitBlockId);
     if (blockId != null) {
         const bcm = getBlockComponentModel(blockId);
         const handled = bcm?.viewModel?.applyZoomCommand?.(direction);
@@ -516,8 +519,8 @@ async function handleZoomCommand(direction: ZoomCommandDirection): Promise<void>
 
 function registerZoomCommandHandler() {
     registerZoomFocusTracking();
-    getApi().onZoomCommand((direction: ZoomCommandDirection) => {
-        fireAndForget(() => handleZoomCommand(direction));
+    getApi().onZoomCommand((direction: ZoomCommandDirection, blockId?: string | null) => {
+        fireAndForget(() => handleZoomCommand(direction, blockId));
     });
 }
 

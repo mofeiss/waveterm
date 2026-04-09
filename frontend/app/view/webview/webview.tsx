@@ -1082,12 +1082,12 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
             }
         };
         const webviewFocus = () => {
-            env.electron.setWebviewFocus(webview.getWebContentsId());
+            env.electron.setWebviewFocus(webview.getWebContentsId(), model.blockId);
             setActiveZoomBlockId(model.blockId);
             model.nodeModel.focusNode();
         };
         const webviewBlur = () => {
-            env.electron.setWebviewFocus(null);
+            env.electron.setWebviewFocus(null, null);
         };
         const handleDomReady = () => {
             globalStore.set(model.domReady, true);

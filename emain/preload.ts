@@ -41,11 +41,11 @@ contextBridge.exposeInMainWorld("api", {
     getUpdaterChannel: () => ipcRenderer.sendSync("get-updater-channel"),
     installAppUpdate: () => ipcRenderer.send("install-app-update"),
     onMenuItemAbout: (callback) => ipcRenderer.on("menu-item-about", callback),
-    onZoomCommand: (callback) => ipcRenderer.on("zoom-command", (_event, direction) => callback(direction)),
+    onZoomCommand: (callback) => ipcRenderer.on("zoom-command", (_event, direction, blockId) => callback(direction, blockId)),
     applyWindowZoomCommand: (direction) => ipcRenderer.invoke("window-zoom-command", direction),
     updateWindowControlsOverlay: (rect) => ipcRenderer.send("update-window-controls-overlay", rect),
     onReinjectKey: (callback) => ipcRenderer.on("reinject-key", (_event, waveEvent) => callback(waveEvent)),
-    setWebviewFocus: (focused: number) => ipcRenderer.send("webview-focus", focused),
+    setWebviewFocus: (focused: number, blockId?: string | null) => ipcRenderer.send("webview-focus", focused, blockId),
     registerGlobalWebviewKeys: (keys) => ipcRenderer.send("register-global-webview-keys", keys),
     onControlShiftStateUpdate: (callback) =>
         ipcRenderer.on("control-shift-state-update", (_event, state) => callback(state)),

@@ -30,6 +30,7 @@ import { ElectronWshClient } from "./emain-wsh";
 const electronApp = electron.app;
 
 let webviewFocusId: number = null;
+let webviewFocusBlockId: string | null = null;
 let webviewKeys: string[] = [];
 
 function getReservedTabSwitchIndex(waveEvent: WaveKeyboardEvent): number | null {
@@ -66,6 +67,10 @@ export function openBuilderWindow(appId?: string) {
         return;
     }
     fireAndForget(() => createBuilderWindow(normalizedAppId));
+}
+
+export function getFocusedWebviewBlockId(): string | null {
+    return webviewFocusBlockId;
 }
 
 type UrlInSessionResult = {
@@ -327,8 +332,9 @@ export function initIpcHandlers() {
 
     const hasBeforeInputRegisteredMap = new Map<number, boolean>();
 
-    electron.ipcMain.on("webview-focus", (event: Electron.IpcMainEvent, focusedId: number) => {
+    electron.ipcMain.on("webview-focus", (event: Electron.IpcMainEvent, focusedId: number, blockId?: string | null) => {
         webviewFocusId = focusedId;
+        webviewFocusBlockId = blockId ?? null;
         console.log("webview-focus", focusedId);
         if (focusedId == null) {
             return;
@@ -350,7 +356,7 @@ export function initIpcHandlers() {
                 const zoomDirection = getZoomCommandDirection(waveEvent);
                 if (zoomDirection != null) {
                     e.preventDefault();
-                    parentWc.send("zoom-command", zoomDirection);
+                    parentWc.send("zoom-command", zoomDirection, webviewFocusBlockId);
                     return;
                 }
                 const reservedTabSwitchIndex = getReservedTabSwitchIndex(waveEvent);
