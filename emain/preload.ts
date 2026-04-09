@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld("api", {
     getUpdaterChannel: () => ipcRenderer.sendSync("get-updater-channel"),
     installAppUpdate: () => ipcRenderer.send("install-app-update"),
     onMenuItemAbout: (callback) => ipcRenderer.on("menu-item-about", callback),
+    onZoomCommand: (callback) => ipcRenderer.on("zoom-command", (_event, direction) => callback(direction)),
+    applyWindowZoomCommand: (direction) => ipcRenderer.invoke("window-zoom-command", direction),
     updateWindowControlsOverlay: (rect) => ipcRenderer.send("update-window-controls-overlay", rect),
     onReinjectKey: (callback) => ipcRenderer.on("reinject-key", (_event, waveEvent) => callback(waveEvent)),
     setWebviewFocus: (focused: number) => ipcRenderer.send("webview-focus", focused),

@@ -4,7 +4,7 @@
 import { BlockNodeModel } from "@/app/block/blocktypes";
 import { Search, useSearch } from "@/app/element/search";
 import { globalStore } from "@/app/store/jotaiStore";
-import { getSimpleControlShiftAtom } from "@/app/store/keymodel";
+import { getSimpleControlShiftAtom, setActiveZoomBlockId } from "@/app/store/keymodel";
 import type { TabModel } from "@/app/store/tab-model";
 import { makeORef } from "@/app/store/wos";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
@@ -613,6 +613,18 @@ export class WebViewModel implements ViewModel {
         return false;
     }
 
+    applyZoomCommand(direction: ZoomCommandDirection): boolean {
+        const currentZoom = globalStore.get(this.domReady) ? this.webviewRef.current?.getZoomFactor() || 1 : 1;
+        if (direction === "reset") {
+            this.setZoomFactor(null);
+            return true;
+        }
+        const delta = direction === "in" ? 0.1 : -0.1;
+        const nextZoom = Math.round((currentZoom + delta) * 100) / 100;
+        this.setZoomFactor(nextZoom);
+        return true;
+    }
+
     setZoomFactor(factor: number | null) {
         // null is ok (will reset to default)
         if (factor != null && factor < 0.1) {
@@ -1071,10 +1083,12 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
         };
         const webviewFocus = () => {
             env.electron.setWebviewFocus(webview.getWebContentsId());
+            setActiveZoomBlockId(model.blockId);
             model.nodeModel.focusNode();
         };
         const webviewBlur = () => {
             env.electron.setWebviewFocus(null);
+            setActiveZoomBlockId(null);
         };
         const handleDomReady = () => {
             globalStore.set(model.domReady, true);
@@ -1103,6 +1117,7 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
 
         // Clean up event listeners on component unmount
         return () => {
+            setActiveZoomBlockId(null);
             webview.removeEventListener("did-frame-navigate", navigateListener);
             webview.removeEventListener("did-navigate", navigateListener);
             webview.removeEventListener("did-navigate-in-page", navigateListener);

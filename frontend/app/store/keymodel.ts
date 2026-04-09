@@ -23,6 +23,7 @@ import {
 import { getActiveTabModel } from "@/app/store/tab-model";
 import { WorkspaceLayoutModel } from "@/app/workspace/workspace-layout-model";
 import { deleteLayoutModelForTab, getLayoutModelForStaticTab, NavigateDirection } from "@/layout/index";
+import { focusedBlockId } from "@/util/focusutil";
 import * as keyutil from "@/util/keyutil";
 import { isWindows } from "@/util/platformutil";
 import { CHORD_TIMEOUT } from "@/util/sharedconst";
@@ -34,6 +35,7 @@ import { isBuilderWindow, isTabWindow } from "./windowtype";
 type KeyHandler = (event: WaveKeyboardEvent) => boolean;
 
 const simpleControlShiftAtom = jotai.atom(false);
+const activeZoomBlockIdAtom = jotai.atom<string | null>(null) as jotai.PrimitiveAtom<string | null>;
 const globalKeyMap = new Map<string, (waveEvent: WaveKeyboardEvent) => boolean>();
 const globalChordMap = new Map<string, Map<string, KeyHandler>>();
 let globalKeybindingsDisabled = false;
@@ -487,6 +489,40 @@ function tryReinjectKey(event: WaveKeyboardEvent): boolean {
     return appHandleKeyDown(event);
 }
 
+function getZoomTargetBlockId(): string | null {
+    const activeZoomBlockId = globalStore.get(activeZoomBlockIdAtom);
+    if (activeZoomBlockId != null) {
+        return activeZoomBlockId;
+    }
+    const domFocusedBlockId = focusedBlockId();
+    if (domFocusedBlockId != null) {
+        return domFocusedBlockId;
+    }
+    return null;
+}
+
+async function handleZoomCommand(direction: ZoomCommandDirection): Promise<void> {
+    const blockId = getZoomTargetBlockId();
+    if (blockId != null) {
+        const bcm = getBlockComponentModel(blockId);
+        const handled = bcm?.viewModel?.applyZoomCommand?.(direction);
+        if (handled) {
+            return;
+        }
+    }
+    await getApi().applyWindowZoomCommand(direction);
+}
+
+function registerZoomCommandHandler() {
+    getApi().onZoomCommand((direction: ZoomCommandDirection) => {
+        fireAndForget(() => handleZoomCommand(direction));
+    });
+}
+
+function setActiveZoomBlockId(blockId: string | null) {
+    globalStore.set(activeZoomBlockIdAtom, blockId);
+}
+
 function countTermBlocks(): number {
     const allBCMs = getAllBlockComponentModels();
     let count = 0;
@@ -790,6 +826,8 @@ export {
     registerControlShiftStateUpdateHandler,
     registerElectronReinjectKeyHandler,
     registerGlobalKeys,
+    registerZoomCommandHandler,
+    setActiveZoomBlockId,
     tryReinjectKey,
     unsetControlShift,
     uxCloseBlock,

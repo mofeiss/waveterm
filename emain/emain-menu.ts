@@ -9,7 +9,6 @@ import { focusedBuilderWindow, getBuilderWindowById } from "./emain-builder";
 import { openBuilderWindow } from "./emain-ipc";
 import { isDev, unamePlatform } from "./emain-platform";
 import { clearTabCache } from "./emain-tabview";
-import { decreaseZoomLevel, increaseZoomLevel, resetZoomLevel } from "./emain-util";
 import {
     createNewWaveWindow,
     createWorkspace,
@@ -207,6 +206,10 @@ function makeViewMenu(
     fullscreenOnLaunch: boolean
 ): Electron.MenuItemConstructorOptions[] {
     const devToolsAccel = unamePlatform === "darwin" ? "Option+Command+I" : "Alt+Shift+I";
+    const sendZoomCommand = (_window: electron.BaseWindow, direction: ZoomCommandDirection) => {
+        const wc = getWindowWebContents(_window) ?? webContents;
+        wc?.send("zoom-command", direction);
+    };
     return [
         {
             label: isBuilderWindowFocused ? "Reload Window" : "Reload Tab",
@@ -236,30 +239,21 @@ function makeViewMenu(
             label: "Reset Zoom",
             accelerator: "CommandOrControl+0",
             click: (_, window) => {
-                const wc = getWindowWebContents(window) ?? webContents;
-                if (wc) {
-                    resetZoomLevel(wc);
-                }
+                sendZoomCommand(window, "reset");
             },
         },
         {
             label: "Zoom In",
             accelerator: "CommandOrControl+=",
             click: (_, window) => {
-                const wc = getWindowWebContents(window) ?? webContents;
-                if (wc) {
-                    increaseZoomLevel(wc);
-                }
+                sendZoomCommand(window, "in");
             },
         },
         {
             label: "Zoom In (hidden)",
             accelerator: "CommandOrControl+Shift+=",
             click: (_, window) => {
-                const wc = getWindowWebContents(window) ?? webContents;
-                if (wc) {
-                    increaseZoomLevel(wc);
-                }
+                sendZoomCommand(window, "in");
             },
             visible: false,
             acceleratorWorksWhenHidden: true,
@@ -268,20 +262,14 @@ function makeViewMenu(
             label: "Zoom Out",
             accelerator: "CommandOrControl+-",
             click: (_, window) => {
-                const wc = getWindowWebContents(window) ?? webContents;
-                if (wc) {
-                    decreaseZoomLevel(wc);
-                }
+                sendZoomCommand(window, "out");
             },
         },
         {
             label: "Zoom Out (hidden)",
             accelerator: "CommandOrControl+Shift+-",
             click: (_, window) => {
-                const wc = getWindowWebContents(window) ?? webContents;
-                if (wc) {
-                    decreaseZoomLevel(wc);
-                }
+                sendZoomCommand(window, "out");
             },
             visible: false,
             acceleratorWorksWhenHidden: true,

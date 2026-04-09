@@ -108,6 +108,7 @@ function PreviewView({
 }) {
     const env = useWaveEnv<PreviewEnv>();
     const connStatus = useAtomValue(model.connStatus);
+    const contentZoom = useAtomValue(model.contentZoomAtom);
     const [errorMsg, setErrorMsg] = useAtom(model.errorMsgAtom);
     const connection = useAtomValue(model.connectionImmediate);
     const fileInfo = useAtomValue(model.statFile);
@@ -150,7 +151,11 @@ function PreviewView({
         <>
             <div key="fullpreview" className="flex flex-col w-full overflow-hidden scrollbar-hide-until-hover">
                 {errorMsg && <ErrorOverlay errorMsg={errorMsg} resetOverlay={() => setErrorMsg(null)} />}
-                <div ref={contentRef} className="flex-grow overflow-hidden">
+                <div
+                    ref={contentRef}
+                    className="flex-grow overflow-hidden"
+                    style={{ zoom: contentZoom === 1 ? undefined : contentZoom }}
+                >
                     <SpecializedView parentRef={contentRef} model={model} />
                 </div>
             </div>

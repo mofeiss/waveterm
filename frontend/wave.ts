@@ -11,6 +11,7 @@ import {
     registerControlShiftStateUpdateHandler,
     registerElectronReinjectKeyHandler,
     registerGlobalKeys,
+    registerZoomCommandHandler,
 } from "@/app/store/keymodel";
 import { modalsModel } from "@/app/store/modalmodel";
 import { RpcApi } from "@/app/store/wshclientapi";
@@ -188,6 +189,7 @@ async function initWave(initOpts: WaveInitOpts) {
         getApi().sendLog("Error in initialization (wave.ts, loading required objects) " + e.message + "\n" + e.stack);
     }
     registerGlobalKeys();
+    registerZoomCommandHandler();
     registerElectronReinjectKeyHandler();
     registerControlShiftStateUpdateHandler();
     await loadMonaco();
@@ -260,6 +262,7 @@ async function initBuilder(initOpts: BuilderInitOpts) {
     const _client = await WOS.loadAndPinWaveObject<Client>(WOS.makeORef("client", initOpts.clientId));
 
     registerBuilderGlobalKeys();
+    registerZoomCommandHandler();
     registerElectronReinjectKeyHandler();
     await loadMonaco();
     const fullConfig = await RpcApi.GetFullConfigCommand(TabRpcClient);

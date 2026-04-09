@@ -22,7 +22,7 @@ import {
 import { createBuilderWindow, getAllBuilderWindows, getBuilderWindowByWebContentsId } from "./emain-builder";
 import { callWithOriginalXdgCurrentDesktopAsync, unamePlatform } from "./emain-platform";
 import { getWaveTabViewByWebContentsId } from "./emain-tabview";
-import { handleCtrlShiftState } from "./emain-util";
+import { decreaseZoomLevel, handleCtrlShiftState, increaseZoomLevel, resetZoomLevel } from "./emain-util";
 import { getWaveVersion } from "./emain-wavesrv";
 import { createNewWaveWindow, getWaveWindowByWebContentsId } from "./emain-window";
 import { ElectronWshClient } from "./emain-wsh";
@@ -298,6 +298,18 @@ export function initIpcHandlers() {
 
     electron.ipcMain.on("get-zoom-factor", (event) => {
         event.returnValue = event.sender.getZoomFactor();
+    });
+
+    electron.ipcMain.handle("window-zoom-command", (event, direction: ZoomCommandDirection) => {
+        if (direction === "in") {
+            increaseZoomLevel(event.sender);
+            return;
+        }
+        if (direction === "out") {
+            decreaseZoomLevel(event.sender);
+            return;
+        }
+        resetZoomLevel(event.sender);
     });
 
     const hasBeforeInputRegisteredMap = new Map<number, boolean>();

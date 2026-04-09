@@ -159,6 +159,7 @@ export class PreviewModel implements ViewModel {
     openFileModalGiveFocusRef: React.RefObject<() => boolean>;
 
     markdownShowToc: PrimitiveAtom<boolean>;
+    contentZoomAtom: PrimitiveAtom<number>;
 
     monacoRef: React.RefObject<MonacoTypes.editor.IStandaloneCodeEditor>;
 
@@ -188,6 +189,7 @@ export class PreviewModel implements ViewModel {
         this.manageConnection = atom(true);
         this.blockAtom = this.env.wos.getWaveObjectAtom<Block>(`block:${blockId}`);
         this.markdownShowToc = atom(false);
+        this.contentZoomAtom = atom(1);
         this.filterOutNowsh = atom(true);
         this.monacoRef = createRef();
         this.connectionError = atom("");
@@ -702,6 +704,60 @@ export class PreviewModel implements ViewModel {
     isSpecializedView(sv: string): boolean {
         const loadableSV = globalStore.get(this.loadableSpecializedView);
         return loadableSV.state == "hasData" && loadableSV.data.specializedView == sv;
+    }
+
+    applyZoomCommand(direction: ZoomCommandDirection): boolean {
+        const blockData = globalStore.get(this.blockAtom);
+        const loadableSV = globalStore.get(this.loadableSpecializedView);
+        const specializedView = loadableSV.state == "hasData" ? loadableSV.data.specializedView : null;
+
+        if (specializedView === "codeedit") {
+            const currentFontSize = (blockData?.meta?.["editor:fontsize"] as number) ??
+                (globalStore.get(this.env.getSettingsKeyAtom("editor:fontsize")) ?? 12);
+            if (direction === "reset") {
+                this.env.rpc.SetMetaCommand(TabRpcClient, {
+                    oref: WOS.makeORef("block", this.blockId),
+                    meta: { "editor:fontsize": null },
+                });
+                return true;
+            }
+            const delta = direction === "in" ? 1 : -1;
+            const nextFontSize = Math.max(6, Math.min(64, currentFontSize + delta));
+            this.env.rpc.SetMetaCommand(TabRpcClient, {
+                oref: WOS.makeORef("block", this.blockId),
+                meta: { "editor:fontsize": nextFontSize },
+            });
+            return true;
+        }
+
+        if (specializedView === "markdown") {
+            const currentFontSize = (blockData?.meta?.["markdown:fontsize"] as number) ?? 12;
+            if (direction === "reset") {
+                this.env.rpc.SetMetaCommand(TabRpcClient, {
+                    oref: WOS.makeORef("block", this.blockId),
+                    meta: { "markdown:fontsize": null, "markdown:fixedfontsize": null },
+                });
+                return true;
+            }
+            const delta = direction === "in" ? 1 : -1;
+            const nextFontSize = Math.max(6, Math.min(64, currentFontSize + delta));
+            this.env.rpc.SetMetaCommand(TabRpcClient, {
+                oref: WOS.makeORef("block", this.blockId),
+                meta: { "markdown:fontsize": nextFontSize, "markdown:fixedfontsize": nextFontSize },
+            });
+            return true;
+        }
+
+        const currentZoom = globalStore.get(this.contentZoomAtom) ?? 1;
+        if (direction === "reset") {
+            globalStore.set(this.contentZoomAtom, 1);
+            return true;
+        }
+        const delta = direction === "in" ? 0.1 : -0.1;
+        const nextZoom = Math.max(0.5, Math.min(3, Math.round((currentZoom + delta) * 100) / 100));
+        globalStore.set(this.contentZoomAtom, nextZoom);
+        return true;
+
     }
 
     getSettingsMenuItems(): ContextMenuItem[] {

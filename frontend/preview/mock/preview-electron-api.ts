@@ -30,6 +30,8 @@ const previewElectronApi: ElectronApi = {
     getUpdaterChannel: () => "",
     installAppUpdate: () => {},
     onMenuItemAbout: (_callback: () => void) => {},
+    onZoomCommand: (_callback: (direction: ZoomCommandDirection) => void) => {},
+    applyWindowZoomCommand: async (_direction: ZoomCommandDirection) => {},
     updateWindowControlsOverlay: (_rect: Dimensions) => {},
     onReinjectKey: (_callback: (waveEvent: WaveKeyboardEvent) => void) => {},
     setWebviewFocus: (_focusedId: number) => {},
@@ -57,6 +59,7 @@ const previewElectronApi: ElectronApi = {
     openBuilder: (_appId?: string) => {},
     setBuilderWindowAppId: (_appId: string) => {},
     doRefresh: () => {},
+    getPathForFile: (_file: File) => "",
     saveTextFile: (_fileName: string, _content: string) => Promise.resolve(false),
     setIsActive: async () => {},
 };

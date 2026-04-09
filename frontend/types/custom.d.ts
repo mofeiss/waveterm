@@ -77,6 +77,8 @@ declare global {
         windowId: string;
     };
 
+    type ZoomCommandDirection = "in" | "out" | "reset";
+
     type ElectronApi = {
         getAuthKey(): string; // get-auth-key
         getIsDev(): boolean; // get-is-dev
@@ -106,6 +108,8 @@ declare global {
         getUpdaterChannel: () => string; // get-updater-channel
         installAppUpdate: () => void; // install-app-update
         onMenuItemAbout: (callback: () => void) => void; // menu-item-about
+        onZoomCommand: (callback: (direction: ZoomCommandDirection) => void) => void; // zoom-command
+        applyWindowZoomCommand: (direction: ZoomCommandDirection) => Promise<void>; // window-zoom-command
         updateWindowControlsOverlay: (rect: Dimensions) => void; // update-window-controls-overlay
         onReinjectKey: (callback: (waveEvent: WaveKeyboardEvent) => void) => void; // reinject-key
         setWebviewFocus: (focusedId: number) => void; // webview-focus, focusedId is the getWebContentsId of the webview
@@ -360,6 +364,9 @@ declare global {
 
         // Handles keydown events within the block.
         keyDownHandler?: (e: WaveKeyboardEvent) => boolean;
+
+        // Applies a zoom command to the block when the block owns zoom behavior.
+        applyZoomCommand?: (direction: ZoomCommandDirection) => boolean;
 
         // Cleans up resources when the block is disposed.
         dispose?: () => void;

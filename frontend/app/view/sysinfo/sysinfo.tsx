@@ -121,6 +121,7 @@ class SysinfoViewModel implements ViewModel {
     manageConnection: jotai.Atom<boolean>;
     filterOutNowsh: jotai.Atom<boolean>;
     connStatus: jotai.Atom<ConnStatus>;
+    zoomFactor: jotai.PrimitiveAtom<number>;
     plotMetaAtom: jotai.PrimitiveAtom<Map<string, TimeSeriesMeta>>;
     endIconButtons: jotai.Atom<IconButtonDecl[]>;
     plotTypeSelectedAtom: jotai.Atom<string>;
@@ -244,6 +245,7 @@ class SysinfoViewModel implements ViewModel {
             const connAtom = this.env.getConnStatusAtom(connName);
             return get(connAtom);
         });
+        this.zoomFactor = jotai.atom(1);
     }
 
     get viewComponent(): ViewComponent {
@@ -315,6 +317,18 @@ class SysinfoViewModel implements ViewModel {
         return fullMenu;
     }
 
+    applyZoomCommand(direction: ZoomCommandDirection): boolean {
+        const currentZoom = globalStore.get(this.zoomFactor) ?? 1;
+        if (direction === "reset") {
+            globalStore.set(this.zoomFactor, 1);
+            return true;
+        }
+        const delta = direction === "in" ? 0.1 : -0.1;
+        const nextZoom = Math.max(0.6, Math.min(2.5, Math.round((currentZoom + delta) * 100) / 100));
+        globalStore.set(this.zoomFactor, nextZoom);
+        return true;
+    }
+
     getDefaultData(): DataItem[] {
         // set it back one to avoid backwards line being possible
         const numPoints = globalStore.get(this.numPoints);
@@ -348,6 +362,7 @@ function SysinfoView({ model, blockId }: SysinfoViewProps) {
     const connName = jotai.useAtomValue(model.connection);
     const lastConnName = React.useRef(connName);
     const connStatus = jotai.useAtomValue(model.connStatus);
+    const zoomFactor = jotai.useAtomValue(model.zoomFactor);
     const addContinuousData = jotai.useSetAtom(model.addContinuousDataAtom);
     const loading = jotai.useAtomValue(model.loadingAtom);
 
@@ -390,7 +405,11 @@ function SysinfoView({ model, blockId }: SysinfoViewProps) {
     if (loading) {
         return null;
     }
-    return <SysinfoViewInner key={connStatus?.connection ?? "local"} blockId={blockId} model={model} />;
+    return (
+        <div style={{ zoom: zoomFactor === 1 ? undefined : zoomFactor }} className="w-full h-full">
+            <SysinfoViewInner key={connStatus?.connection ?? "local"} blockId={blockId} model={model} />
+        </div>
+    );
 }
 
 type SingleLinePlotProps = {

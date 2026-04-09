@@ -613,6 +613,34 @@ export class TermViewModel implements ViewModel {
         return false;
     }
 
+    applyZoomCommand(direction: ZoomCommandDirection): boolean {
+        const blockData = globalStore.get(this.blockAtom);
+        const currentFontSize = globalStore.get(this.fontSizeAtom) ?? 12;
+        const overrideFontSize = blockData?.meta?.["term:fontsize"];
+
+        if (direction === "reset") {
+            if (overrideFontSize == null) {
+                return true;
+            }
+            RpcApi.SetMetaCommand(TabRpcClient, {
+                oref: WOS.makeORef("block", this.blockId),
+                meta: { "term:fontsize": null },
+            });
+            return true;
+        }
+
+        const delta = direction === "in" ? 1 : -1;
+        const nextFontSize = boundNumber(currentFontSize + delta, 4, 64);
+        if (nextFontSize === currentFontSize) {
+            return true;
+        }
+        RpcApi.SetMetaCommand(TabRpcClient, {
+            oref: WOS.makeORef("block", this.blockId),
+            meta: { "term:fontsize": nextFontSize },
+        });
+        return true;
+    }
+
     keyDownHandler(waveEvent: WaveKeyboardEvent): boolean {
         if (keyutil.checkKeyPressed(waveEvent, "Ctrl:r")) {
             const shellIntegrationStatus = readAtom(this.termRef?.current?.shellIntegrationStatusAtom);
