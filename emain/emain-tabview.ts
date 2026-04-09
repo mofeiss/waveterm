@@ -315,6 +315,7 @@ export async function getOrCreateWebViewForTab(waveWindowId: string, tabId: stri
     tabView.webContents.on("will-navigate", shNavHandler);
     tabView.webContents.on("will-frame-navigate", shFrameNavHandler);
     tabView.webContents.on("did-attach-webview", (event, wc) => {
+        configureAuthKeyRequestInjection(wc.session);
         wc.setWindowOpenHandler((details) => {
             if (wc == null || wc.isDestroyed() || tabView.webContents == null || tabView.webContents.isDestroyed()) {
                 return { action: "deny" };

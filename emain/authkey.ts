@@ -7,12 +7,18 @@ import { getWebServerEndpoint, getWSServerEndpoint } from "../frontend/util/endp
 const AuthKeyHeader = "X-AuthKey";
 export const WaveAuthKeyEnv = "WAVETERM_AUTH_KEY";
 export const AuthKey = crypto.randomUUID();
+const configuredAuthSessions = new WeakSet<Electron.Session>();
 
 ipcMain.on("get-auth-key", (event) => {
     event.returnValue = AuthKey;
 });
 
 export function configureAuthKeyRequestInjection(session: Electron.Session) {
+    if (session == null || configuredAuthSessions.has(session)) {
+        return;
+    }
+    configuredAuthSessions.add(session);
+
     const filter: Electron.WebRequestFilter = {
         urls: [`${getWebServerEndpoint()}/*`, `${getWSServerEndpoint()}/*`],
     };

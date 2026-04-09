@@ -17,6 +17,8 @@ import { MockBoundary } from "@/app/waveenv/mockboundary";
 import { useWaveEnv } from "@/app/waveenv/waveenv";
 import { openLink } from "@/store/global";
 import { adaptFromReactOrNativeKeyEvent, checkKeyPressed } from "@/util/keyutil";
+import { getEnv } from "@/util/getenv";
+import { WaveDevViteVarName } from "@/util/isdev";
 import { fireAndForget, useAtomValueSafe } from "@/util/util";
 import clsx from "clsx";
 import { WebviewTag } from "electron";
@@ -32,6 +34,11 @@ const USER_AGENT_ANDROID =
     "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36";
 
 let webviewPreloadUrl = null;
+const DevWebviewPartition = "persist:waveterm-web-panel";
+
+function shouldUseDevWebviewPartition(): boolean {
+    return !!getEnv(WaveDevViteVarName);
+}
 
 function normalizeBlankWebUrl(url?: string | null): string {
     if (url == null) {
@@ -891,7 +898,7 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
     const zoomFactor = useAtomValue(env.getBlockMetaKeyAtom(model.blockId, "web:zoom")) || 1;
     const partitionOverride = useAtomValueSafe(model.partitionOverride);
     const metaPartition = useAtomValue(env.getBlockMetaKeyAtom(model.blockId, "web:partition"));
-    const webPartition = partitionOverride || metaPartition || undefined;
+    const webPartition = partitionOverride || metaPartition || (shouldUseDevWebviewPartition() ? DevWebviewPartition : undefined);
     const userAgentType = useAtomValue(model.userAgentType) || "default";
 
     // Determine user agent string based on type
