@@ -402,6 +402,15 @@ export class WaveBrowserWindow extends BaseWindow {
         await this._queueActionInternal({ op: "switchtab", tabId, setInBackend, primaryStartupTab });
     }
 
+    async setActiveTabByIndex(index: number) {
+        const workspace = await WorkspaceService.GetWorkspace(this.workspaceId);
+        const tabId = workspace?.tabids?.[index - 1];
+        if (tabId == null) {
+            return;
+        }
+        await this.setActiveTab(tabId, true);
+    }
+
     private async initializeTab(tabView: WaveTabView, primaryStartupTab: boolean) {
         const clientId = await getClientId();
         await this.awaitWithDevTimeout(tabView.initPromise, "initPromise", tabView.waveTabId);

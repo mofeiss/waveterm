@@ -32,6 +32,18 @@ const electronApp = electron.app;
 let webviewFocusId: number = null;
 let webviewKeys: string[] = [];
 
+function getReservedTabSwitchIndex(waveEvent: WaveKeyboardEvent): number | null {
+    if (unamePlatform !== "darwin") {
+        return null;
+    }
+    for (let idx = 1; idx <= 9; idx++) {
+        if (keyutil.checkKeyPressed(waveEvent, `Cmd:${idx}`)) {
+            return idx;
+        }
+    }
+    return null;
+}
+
 export function openBuilderWindow(appId?: string) {
     const normalizedAppId = appId || "";
     const existingBuilderWindows = getAllBuilderWindows();
@@ -307,10 +319,17 @@ export function initIpcHandlers() {
             webviewWc.on("before-input-event", (e, input) => {
                 let waveEvent = keyutil.adaptFromElectronKeyEvent(input);
                 handleCtrlShiftState(parentWc, waveEvent);
-                if (webviewFocusId != focusedId) {
+                if (input.type != "keyDown") {
                     return;
                 }
-                if (input.type != "keyDown") {
+                const reservedTabSwitchIndex = getReservedTabSwitchIndex(waveEvent);
+                if (reservedTabSwitchIndex != null) {
+                    e.preventDefault();
+                    const ww = getWaveWindowByWebContentsId(parentWc.id);
+                    fireAndForget(() => ww?.setActiveTabByIndex(reservedTabSwitchIndex));
+                    return;
+                }
+                if (webviewFocusId != focusedId) {
                     return;
                 }
                 for (let keyDesc of webviewKeys) {

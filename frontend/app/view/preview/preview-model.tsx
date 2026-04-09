@@ -339,9 +339,7 @@ export class PreviewModel implements ViewModel {
                         elemtype: "iconbutton",
                         icon: showHiddenFiles ? "eye" : "eye-slash",
                         title: showHiddenFiles ? "Hide Hidden Files" : "Show Hidden Files",
-                        click: () => {
-                            globalStore.set(this.showHiddenFiles, (prev) => !prev);
-                        },
+                        click: () => this.toggleShowHiddenFiles(),
                     },
                     {
                         elemtype: "iconbutton",
@@ -493,6 +491,12 @@ export class PreviewModel implements ViewModel {
 
     markdownShowTocToggle() {
         globalStore.set(this.markdownShowToc, !globalStore.get(this.markdownShowToc));
+    }
+
+    toggleShowHiddenFiles() {
+        const nextValue = !globalStore.get(this.showHiddenFiles);
+        globalStore.set(this.showHiddenFiles, nextValue);
+        fireAndForget(() => this.env.rpc.SetConfigCommand(TabRpcClient, { "preview:showhiddenfiles": nextValue }));
     }
 
     get viewComponent(): ViewComponent {

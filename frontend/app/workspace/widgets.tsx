@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Tooltip } from "@/app/element/tooltip";
+import { globalStore } from "@/app/store/jotaiStore";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
 import { useWaveEnv, WaveEnv, WaveEnvSubset } from "@/app/waveenv/waveenv";
 import { shouldIncludeWidgetForWorkspace } from "@/app/workspace/widgetfilter";
+import * as WOS from "@/store/wos";
+import { getLayoutModelForStaticTab } from "@/layout/index";
 import { modalsModel } from "@/store/modalmodel";
 import { fireAndForget, isBlank, makeIconClass } from "@/util/util";
 import {
@@ -56,7 +59,41 @@ type WidgetPropsType = {
 };
 
 async function handleWidgetSelect(widget: WidgetConfigType, env: WidgetsEnv) {
-    const blockDef = widget.blockdef;
+    const blockDef: BlockDef = {
+        ...widget.blockdef,
+        meta: {
+            ...(widget.blockdef?.meta ?? {}),
+        },
+    };
+
+    if (blockDef.meta?.view === "preview") {
+        const layoutModel = getLayoutModelForStaticTab();
+        const focusedNode = globalStore.get(layoutModel.focusedNode);
+        const focusedBlockId = focusedNode?.data?.blockId;
+
+        if (focusedBlockId != null) {
+            const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", focusedBlockId));
+            const focusedBlock = globalStore.get(blockAtom);
+            const focusedMeta = focusedBlock?.meta ?? {};
+            const focusedConnection = focusedMeta.connection;
+
+            let nextFile = blockDef.meta.file;
+
+            if (focusedMeta.view === "term" && focusedMeta["cmd:cwd"]) {
+                nextFile = focusedMeta["cmd:cwd"];
+            } else if (focusedMeta.view === "preview" && focusedMeta.file) {
+                nextFile = focusedMeta.file;
+            }
+
+            if (nextFile != null) {
+                blockDef.meta.file = nextFile;
+            }
+            if (focusedConnection != null) {
+                blockDef.meta.connection = focusedConnection;
+            }
+        }
+    }
+
     env.createBlock(blockDef, widget.magnified);
 }
 

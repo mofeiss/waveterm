@@ -637,6 +637,10 @@ function DirectoryPreview({ model }: DirectoryPreviewProps) {
                 globalStore.set(model.directorySearchActive, true);
                 return true;
             }
+            if (checkKeyPressed(waveEvent, "Cmd:Shift:c{Period}")) {
+                model.toggleShowHiddenFiles();
+                return true;
+            }
             if (checkKeyPressed(waveEvent, "Escape")) {
                 setSearchText("");
                 globalStore.set(model.directorySearchActive, false);

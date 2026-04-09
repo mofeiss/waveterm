@@ -33,6 +33,14 @@ const USER_AGENT_ANDROID =
 
 let webviewPreloadUrl = null;
 
+function normalizeBlankWebUrl(url?: string | null): string {
+    if (url == null) {
+        return "";
+    }
+    const trimmedUrl = url.trim();
+    return trimmedUrl === "about:blank" ? "" : trimmedUrl;
+}
+
 function getWebviewPreloadUrl(env: WebViewEnv) {
     if (webviewPreloadUrl == null) {
         webviewPreloadUrl = env.electron.getWebviewPreload();
@@ -75,6 +83,7 @@ export class WebViewModel implements ViewModel {
     userAgentType: Atom<string>;
     env: WebViewEnv;
     ctrlShiftUnsubFn: (() => void) | null = null;
+    autoFocusUrlInputPending: boolean;
 
     constructor({ blockId, nodeModel, tabModel, waveEnv }: ViewModelInitType) {
         this.nodeModel = nodeModel;
@@ -105,6 +114,7 @@ export class WebViewModel implements ViewModel {
         this.typeaheadOpen = atom(false);
         this.partitionOverride = null;
         this.userAgentType = this.env.getBlockMetaKeyAtom(blockId, "web:useragenttype");
+        this.autoFocusUrlInputPending = true;
 
         this.mediaPlaying = atom(false);
         this.mediaMuted = atom(false);
@@ -117,7 +127,7 @@ export class WebViewModel implements ViewModel {
             const refreshIcon = get(this.refreshIcon);
             const mediaPlaying = get(this.mediaPlaying);
             const mediaMuted = get(this.mediaMuted);
-            const url = currUrl ?? metaUrl ?? homepageUrl ?? "";
+            const url = currUrl ?? metaUrl ?? "";
             const rtn: HeaderElem[] = [];
             if (get(this.hideNav)) {
                 return rtn;
@@ -378,21 +388,24 @@ export class WebViewModel implements ViewModel {
      * @param url The URL that has been navigated to.
      */
     handleNavigate(url: string) {
+        const normalizedUrl = normalizeBlankWebUrl(url);
         fireAndForget(() =>
             this.env.rpc.SetMetaCommand(TabRpcClient, {
                 oref: makeORef("block", this.blockId),
-                meta: { url },
+                meta: { url: normalizedUrl },
             })
         );
-        globalStore.set(this.url, url);
+        globalStore.set(this.url, normalizedUrl);
         if (this.searchAtoms) {
             globalStore.set(this.searchAtoms.isOpen, false);
         }
     }
 
     ensureUrlScheme(url: string, searchTemplate: string) {
-        if (url == null) {
-            url = "";
+        url = normalizeBlankWebUrl(url);
+
+        if (url === "") {
+            return "about:blank";
         }
 
         if (/^(http|https|file):/.test(url)) {
@@ -476,7 +489,12 @@ export class WebViewModel implements ViewModel {
      * @returns The URL from the state.
      */
     getUrl() {
-        return globalStore.get(this.url);
+        const currentUrl = globalStore.get(this.url);
+        if (currentUrl != null) {
+            return currentUrl;
+        }
+        const metaUrl = globalStore.get(this.blockAtom)?.meta?.url;
+        return normalizeBlankWebUrl(metaUrl);
     }
 
     setRefreshIcon(refreshIcon: string) {
@@ -530,6 +548,14 @@ export class WebViewModel implements ViewModel {
         }
         if (ctrlShiftState) {
             return false;
+        }
+        if (this.autoFocusUrlInputPending && !globalStore.get(this.hideNav) && this.getUrl() === "") {
+            this.autoFocusUrlInputPending = false;
+            setTimeout(() => {
+                this.urlInputRef.current?.focus();
+                this.urlInputRef.current?.select();
+            }, 0);
+            return true;
         }
         this.webviewRef.current?.focus();
         return true;
@@ -847,11 +873,9 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
     const defaultUrl = useAtomValue(model.homepageUrl);
     const defaultSearchAtom = env.getSettingsKeyAtom("web:defaultsearch");
     const defaultSearch = useAtomValue(defaultSearchAtom);
-    let metaUrl = blockData?.meta?.url || defaultUrl || "";
-    if (metaUrl) {
-        metaUrl = model.ensureUrlScheme(metaUrl, defaultSearch);
-    }
-    const metaUrlRef = useRef(metaUrl);
+    const metaUrl = normalizeBlankWebUrl(blockData?.meta?.url);
+    const loadedMetaUrl = model.ensureUrlScheme(metaUrl, defaultSearch);
+    const metaUrlRef = useRef(loadedMetaUrl);
     const zoomFactor = useAtomValue(env.getBlockMetaKeyAtom(model.blockId, "web:zoom")) || 1;
     const partitionOverride = useAtomValueSafe(model.partitionOverride);
     const metaPartition = useAtomValue(env.getBlockMetaKeyAtom(model.blockId, "web:partition"));
@@ -919,7 +943,7 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
     // End Search
 
     // The initial value of the block metadata URL when the component first renders. Used to set the starting src value for the webview.
-    const [metaUrlInitial] = useState(initialSrc || metaUrl);
+    const [metaUrlInitial] = useState(initialSrc || loadedMetaUrl);
     const prevUserAgentTypeRef = useRef(userAgentType);
 
     const [webContentsId, setWebContentsId] = useState(null);
@@ -980,11 +1004,11 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
             // Skip URL loading if initialSrc is provided (it's already loaded via src attribute)
             return;
         }
-        if (metaUrlRef.current != metaUrl) {
-            metaUrlRef.current = metaUrl;
+        if (metaUrlRef.current != loadedMetaUrl) {
+            metaUrlRef.current = loadedMetaUrl;
             model.loadUrl(metaUrl, "meta");
         }
-    }, [metaUrl, initialSrc]);
+    }, [loadedMetaUrl, metaUrl, initialSrc]);
 
     // Reload webview when user agent type changes
     useEffect(() => {

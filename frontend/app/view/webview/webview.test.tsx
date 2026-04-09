@@ -21,6 +21,50 @@ describe("webview preview fallback", () => {
         expect(getWebPreviewDisplayUrl(null)).toBe("about:blank");
     });
 
+    it("treats blank URLs as about:blank instead of a search query", () => {
+        const env = makeMockWaveEnv();
+        const model = new WebViewModel({
+            blockId: "webview-blank-url",
+            nodeModel: {
+                isFocused: atom(true),
+                focusNode: () => {},
+            } as any,
+            tabModel: {} as any,
+            waveEnv: env,
+        });
+
+        expect(model.ensureUrlScheme("", null)).toBe("about:blank");
+        expect(model.ensureUrlScheme("about:blank", null)).toBe("about:blank");
+    });
+
+    it("keeps about:blank out of the address bar state", () => {
+        const blockId = "webview-addressbar-blank";
+        const env = makeMockWaveEnv({
+            mockWaveObjs: {
+                [`block:${blockId}`]: {
+                    otype: "block",
+                    oid: blockId,
+                    version: 1,
+                    meta: {
+                        view: "web",
+                        url: "about:blank",
+                    },
+                } as Block,
+            },
+        });
+        const model = new WebViewModel({
+            blockId,
+            nodeModel: {
+                isFocused: atom(true),
+                focusNode: () => {},
+            } as any,
+            tabModel: {} as any,
+            waveEnv: env,
+        });
+
+        expect(model.getUrl()).toBe("");
+    });
+
     it("uses the supplied env for homepage atoms and config updates", async () => {
         const blockId = "webview-env-block";
         const env = makeMockWaveEnv({
