@@ -44,6 +44,19 @@ function getReservedTabSwitchIndex(waveEvent: WaveKeyboardEvent): number | null 
     return null;
 }
 
+function getZoomCommandDirection(waveEvent: WaveKeyboardEvent): ZoomCommandDirection | null {
+    if (keyutil.checkKeyPressed(waveEvent, "Cmd:=")) {
+        return "in";
+    }
+    if (keyutil.checkKeyPressed(waveEvent, "Cmd:-")) {
+        return "out";
+    }
+    if (keyutil.checkKeyPressed(waveEvent, "Cmd:0")) {
+        return "reset";
+    }
+    return null;
+}
+
 export function openBuilderWindow(appId?: string) {
     const normalizedAppId = appId || "";
     const existingBuilderWindows = getAllBuilderWindows();
@@ -332,6 +345,12 @@ export function initIpcHandlers() {
                 let waveEvent = keyutil.adaptFromElectronKeyEvent(input);
                 handleCtrlShiftState(parentWc, waveEvent);
                 if (input.type != "keyDown") {
+                    return;
+                }
+                const zoomDirection = getZoomCommandDirection(waveEvent);
+                if (zoomDirection != null) {
+                    e.preventDefault();
+                    parentWc.send("zoom-command", zoomDirection);
                     return;
                 }
                 const reservedTabSwitchIndex = getReservedTabSwitchIndex(waveEvent);

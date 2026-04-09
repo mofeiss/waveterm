@@ -23,7 +23,7 @@ import {
 import { getActiveTabModel } from "@/app/store/tab-model";
 import { WorkspaceLayoutModel } from "@/app/workspace/workspace-layout-model";
 import { deleteLayoutModelForTab, getLayoutModelForStaticTab, NavigateDirection } from "@/layout/index";
-import { focusedBlockId } from "@/util/focusutil";
+import { findBlockId, focusedBlockId } from "@/util/focusutil";
 import * as keyutil from "@/util/keyutil";
 import { isWindows } from "@/util/platformutil";
 import { CHORD_TIMEOUT } from "@/util/sharedconst";
@@ -39,6 +39,7 @@ const activeZoomBlockIdAtom = jotai.atom<string | null>(null) as jotai.Primitive
 const globalKeyMap = new Map<string, (waveEvent: WaveKeyboardEvent) => boolean>();
 const globalChordMap = new Map<string, Map<string, KeyHandler>>();
 let globalKeybindingsDisabled = false;
+let zoomFocusTrackingRegistered = false;
 
 // track current chord state and timeout (for resetting)
 let activeChord: string | null = null;
@@ -514,13 +515,51 @@ async function handleZoomCommand(direction: ZoomCommandDirection): Promise<void>
 }
 
 function registerZoomCommandHandler() {
+    registerZoomFocusTracking();
     getApi().onZoomCommand((direction: ZoomCommandDirection) => {
         fireAndForget(() => handleZoomCommand(direction));
     });
 }
 
+function updateActiveZoomBlockIdFromTarget(target: EventTarget | null) {
+    let elem: HTMLElement = null;
+    if (target instanceof HTMLElement) {
+        elem = target;
+    } else if (target instanceof Text) {
+        elem = target.parentElement;
+    }
+    setActiveZoomBlockId(elem != null ? findBlockId(elem) : null);
+}
+
+function registerZoomFocusTracking() {
+    if (zoomFocusTrackingRegistered) {
+        return;
+    }
+    zoomFocusTrackingRegistered = true;
+    document.addEventListener(
+        "focusin",
+        (event) => {
+            updateActiveZoomBlockIdFromTarget(event.target);
+        },
+        true
+    );
+    document.addEventListener(
+        "pointerdown",
+        (event) => {
+            updateActiveZoomBlockIdFromTarget(event.target);
+        },
+        true
+    );
+}
+
 function setActiveZoomBlockId(blockId: string | null) {
     globalStore.set(activeZoomBlockIdAtom, blockId);
+}
+
+function clearActiveZoomBlockId(blockId?: string) {
+    if (blockId == null || globalStore.get(activeZoomBlockIdAtom) === blockId) {
+        globalStore.set(activeZoomBlockIdAtom, null);
+    }
 }
 
 function countTermBlocks(): number {
@@ -827,6 +866,7 @@ export {
     registerElectronReinjectKeyHandler,
     registerGlobalKeys,
     registerZoomCommandHandler,
+    clearActiveZoomBlockId,
     setActiveZoomBlockId,
     tryReinjectKey,
     unsetControlShift,

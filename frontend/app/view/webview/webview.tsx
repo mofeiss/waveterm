@@ -4,7 +4,7 @@
 import { BlockNodeModel } from "@/app/block/blocktypes";
 import { Search, useSearch } from "@/app/element/search";
 import { globalStore } from "@/app/store/jotaiStore";
-import { getSimpleControlShiftAtom, setActiveZoomBlockId } from "@/app/store/keymodel";
+import { clearActiveZoomBlockId, getSimpleControlShiftAtom, setActiveZoomBlockId } from "@/app/store/keymodel";
 import type { TabModel } from "@/app/store/tab-model";
 import { makeORef } from "@/app/store/wos";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
@@ -1088,7 +1088,6 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
         };
         const webviewBlur = () => {
             env.electron.setWebviewFocus(null);
-            setActiveZoomBlockId(null);
         };
         const handleDomReady = () => {
             globalStore.set(model.domReady, true);
@@ -1117,7 +1116,7 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
 
         // Clean up event listeners on component unmount
         return () => {
-            setActiveZoomBlockId(null);
+            clearActiveZoomBlockId(model.blockId);
             webview.removeEventListener("did-frame-navigate", navigateListener);
             webview.removeEventListener("did-navigate", navigateListener);
             webview.removeEventListener("did-navigate-in-page", navigateListener);
