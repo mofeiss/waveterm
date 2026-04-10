@@ -585,7 +585,8 @@ function refocusNode(blockId: string) {
     }
     layoutModel.focusNode(layoutNodeId.id);
     const bcm = getBlockComponentModel(blockId);
-    const ok = bcm?.viewModel?.giveFocus?.();
+    const viewModel = bcm?.getActiveViewModel?.() ?? bcm?.viewModel;
+    const ok = viewModel?.giveFocus?.();
     if (!ok) {
         const inputElem = document.getElementById(`${blockId}-dummy-focus`);
         inputElem?.focus();
@@ -685,7 +686,6 @@ export {
     getBlockComponentModel,
     getBlockMetaKeyAtom,
     getBlockTermDurableAtom,
-    getTabMetaKeyAtom,
     getConfigBackgroundAtom,
     getConnConfigKeyAtom,
     getConnStatusAtom,
@@ -697,6 +697,7 @@ export {
     getOverrideConfigAtom,
     getSettingsKeyAtom,
     getSettingsPrefixAtom,
+    getTabMetaKeyAtom,
     getUserName,
     globalPrimaryTabStartup,
     globalStore,

@@ -1,10 +1,7 @@
 // Copyright 2026, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-    getBlockCloseLockedAtom,
-    toggleBlockCloseLocked,
-} from "@/app/block/block-close-guard";
+import { getBlockCloseLockedAtom, toggleBlockCloseLocked } from "@/app/block/block-close-guard";
 import {
     blockViewToIcon,
     blockViewToName,
@@ -23,7 +20,7 @@ import {
     WOS,
 } from "@/app/store/global";
 import { globalStore } from "@/app/store/jotaiStore";
-import { closeBlockIgnoringLock, uxCloseBlock } from "@/app/store/keymodel";
+import { uxCloseBlock } from "@/app/store/keymodel";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
 import { useWaveEnv } from "@/app/waveenv/waveenv";
 import { IconButton } from "@/element/iconbutton";
@@ -66,7 +63,7 @@ function handleHeaderContextMenu(
         { type: "separator" },
         {
             label: "Close Block",
-            click: () => closeBlockIgnoringLock(blockId),
+            click: () => uxCloseBlock(blockId),
         }
     );
     blockEnv.showContextMenu(menu, e);
@@ -120,120 +117,152 @@ type HeaderEndIconsProps = {
     viewModel: ViewModel;
     nodeModel: NodeModel;
     blockId: string;
+    headerTabs?: React.ReactNode;
+    showAddTabButton?: boolean;
+    onAddTab?: (view: "term" | "web" | "preview") => Promise<void> | void;
 };
 
-const HeaderEndIcons = React.memo(({ viewModel, nodeModel, blockId }: HeaderEndIconsProps) => {
-    const blockEnv = useWaveEnv<BlockEnv>();
-    const closeLocked = jotai.useAtomValue(getBlockCloseLockedAtom(blockId));
-    const endIconButtons = util.useAtomValueSafe(viewModel?.endIconButtons);
-    const magnified = jotai.useAtomValue(nodeModel.isMagnified);
-    const ephemeral = jotai.useAtomValue(nodeModel.isEphemeral);
-    const numLeafs = jotai.useAtomValue(nodeModel.numLeafs);
-    const magnifyDisabled = numLeafs <= 1;
-    const showSplitButtons = jotai.useAtomValue(blockEnv.getSettingsKeyAtom("term:showsplitbuttons"));
+const HeaderEndIcons = React.memo(
+    ({ viewModel, nodeModel, blockId, headerTabs, showAddTabButton, onAddTab }: HeaderEndIconsProps) => {
+        const blockEnv = useWaveEnv<BlockEnv>();
+        const closeLocked = jotai.useAtomValue(getBlockCloseLockedAtom(blockId));
+        const endIconButtons = util.useAtomValueSafe(viewModel?.endIconButtons);
+        const magnified = jotai.useAtomValue(nodeModel.isMagnified);
+        const ephemeral = jotai.useAtomValue(nodeModel.isEphemeral);
+        const numLeafs = jotai.useAtomValue(nodeModel.numLeafs);
+        const magnifyDisabled = numLeafs <= 1;
+        const showSplitButtons = jotai.useAtomValue(blockEnv.getSettingsKeyAtom("term:showsplitbuttons"));
 
-    const endIconsElem: React.ReactElement[] = [];
+        const endIconsElem: React.ReactElement[] = [];
 
-    if (endIconButtons && endIconButtons.length > 0) {
-        endIconsElem.push(...endIconButtons.map((button, idx) => <IconButton key={idx} decl={button} />));
-    }
-    if (showSplitButtons && viewModel?.viewType === "term") {
-        const splitHorizontalDecl: IconButtonDecl = {
+        if (endIconButtons && endIconButtons.length > 0) {
+            endIconsElem.push(...endIconButtons.map((button, idx) => <IconButton key={idx} decl={button} />));
+        }
+        if (showSplitButtons && viewModel?.viewType === "term") {
+            const splitHorizontalDecl: IconButtonDecl = {
+                elemtype: "iconbutton",
+                icon: "columns",
+                title: "Split Horizontally",
+                click: (e) => {
+                    e.stopPropagation();
+                    const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId));
+                    const blockData = globalStore.get(blockAtom);
+                    const blockDef: BlockDef = {
+                        meta: blockData?.meta || { view: "term", controller: "shell" },
+                    };
+                    createBlockSplitHorizontally(blockDef, blockId, "after");
+                },
+            };
+            const splitVerticalDecl: IconButtonDecl = {
+                elemtype: "iconbutton",
+                icon: "grip-lines",
+                title: "Split Vertically",
+                click: (e) => {
+                    e.stopPropagation();
+                    const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId));
+                    const blockData = globalStore.get(blockAtom);
+                    const blockDef: BlockDef = {
+                        meta: blockData?.meta || { view: "term", controller: "shell" },
+                    };
+                    createBlockSplitVertically(blockDef, blockId, "after");
+                },
+            };
+            endIconsElem.push(<IconButton key="split-horizontal" decl={splitHorizontalDecl} />);
+            endIconsElem.push(<IconButton key="split-vertical" decl={splitVerticalDecl} />);
+        }
+        const lockDecl: IconButtonDecl = {
             elemtype: "iconbutton",
-            icon: "columns",
-            title: "Split Horizontally",
+            icon: closeLocked ? "lock" : "unlock",
+            title: closeLocked ? "Unlock Panel Close" : "Lock Panel Close",
             click: (e) => {
                 e.stopPropagation();
-                const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId));
-                const blockData = globalStore.get(blockAtom);
-                const blockDef: BlockDef = {
-                    meta: blockData?.meta || { view: "term", controller: "shell" },
-                };
-                createBlockSplitHorizontally(blockDef, blockId, "after");
+                toggleBlockCloseLocked(blockId);
             },
         };
-        const splitVerticalDecl: IconButtonDecl = {
-            elemtype: "iconbutton",
-            icon: "grip-lines",
-            title: "Split Vertically",
-            click: (e) => {
-                e.stopPropagation();
-                const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId));
-                const blockData = globalStore.get(blockAtom);
-                const blockDef: BlockDef = {
-                    meta: blockData?.meta || { view: "term", controller: "shell" },
-                };
-                createBlockSplitVertically(blockDef, blockId, "after");
-            },
-        };
-        endIconsElem.push(<IconButton key="split-horizontal" decl={splitHorizontalDecl} />);
-        endIconsElem.push(<IconButton key="split-vertical" decl={splitVerticalDecl} />);
-    }
-    const lockDecl: IconButtonDecl = {
-        elemtype: "iconbutton",
-        icon: closeLocked ? "lock" : "unlock",
-        title: closeLocked ? "Unlock Panel Close" : "Lock Panel Close",
-        click: (e) => {
-            e.stopPropagation();
-            toggleBlockCloseLocked(blockId);
-        },
-    };
-    endIconsElem.push(
-        <IconButton
-            key="close-lock"
-            decl={lockDecl}
-            className={cn("block-frame-close-lock", closeLocked && "block-frame-close-lock-locked")}
-        />
-    );
-    const settingsDecl: IconButtonDecl = {
-        elemtype: "iconbutton",
-        icon: "cog",
-        title: "Settings",
-        click: (e) => handleHeaderContextMenu(e, blockId, viewModel, nodeModel, blockEnv),
-    };
-    endIconsElem.push(<IconButton key="settings" decl={settingsDecl} className="block-frame-settings" />);
-    if (ephemeral) {
-        const addToLayoutDecl: IconButtonDecl = {
-            elemtype: "iconbutton",
-            icon: "circle-plus",
-            title: "Add to Layout",
-            click: () => {
-                nodeModel.addEphemeralNodeToLayout();
-            },
-        };
-        endIconsElem.push(<IconButton key="add-to-layout" decl={addToLayoutDecl} />);
-    } else {
+        if (headerTabs != null) {
+            endIconsElem.push(
+                <div key="block-tabs" className="block-frame-tabs-wrap">
+                    {headerTabs}
+                </div>
+            );
+        }
         endIconsElem.push(
-            <OptMagnifyButton
-                key="unmagnify"
-                magnified={magnified}
-                toggleMagnify={() => {
-                    nodeModel.toggleMagnify();
-                    setTimeout(() => refocusNode(blockId), 50);
-                }}
-                disabled={magnifyDisabled}
+            <IconButton
+                key="close-lock"
+                decl={lockDecl}
+                className={cn("block-frame-close-lock", closeLocked && "block-frame-close-lock-locked")}
             />
         );
+        if (showAddTabButton && onAddTab != null) {
+            const addTabDecl: IconButtonDecl = {
+                elemtype: "iconbutton",
+                icon: "plus",
+                title: "Add Tab",
+                click: (e) => {
+                    e.stopPropagation();
+                    const menu: ContextMenuItem[] = [
+                        { label: "Terminal", click: () => void onAddTab("term") },
+                        { label: "Web", click: () => void onAddTab("web") },
+                        { label: "Files", click: () => void onAddTab("preview") },
+                    ];
+                    blockEnv.showContextMenu(menu, e);
+                },
+            };
+            endIconsElem.push(<IconButton key="add-tab" decl={addTabDecl} className="block-frame-add-tab" />);
+        }
+        const settingsDecl: IconButtonDecl = {
+            elemtype: "iconbutton",
+            icon: "cog",
+            title: "Settings",
+            click: (e) => handleHeaderContextMenu(e, blockId, viewModel, nodeModel, blockEnv),
+        };
+        endIconsElem.push(<IconButton key="settings" decl={settingsDecl} className="block-frame-settings" />);
+        if (ephemeral) {
+            const addToLayoutDecl: IconButtonDecl = {
+                elemtype: "iconbutton",
+                icon: "circle-plus",
+                title: "Add to Layout",
+                click: () => {
+                    nodeModel.addEphemeralNodeToLayout();
+                },
+            };
+            endIconsElem.push(<IconButton key="add-to-layout" decl={addToLayoutDecl} />);
+        } else {
+            endIconsElem.push(
+                <OptMagnifyButton
+                    key="unmagnify"
+                    magnified={magnified}
+                    toggleMagnify={() => {
+                        nodeModel.toggleMagnify();
+                        setTimeout(() => refocusNode(blockId), 50);
+                    }}
+                    disabled={magnifyDisabled}
+                />
+            );
+        }
+
+        const closeDecl: IconButtonDecl = {
+            elemtype: "iconbutton",
+            icon: "xmark-large",
+            title: "Close",
+            click: (e) => {
+                e.stopPropagation();
+                uxCloseBlock(nodeModel.blockId);
+            },
+        };
+        endIconsElem.push(<IconButton key="close" decl={closeDecl} className="block-frame-default-close" />);
+
+        return <div className="block-frame-end-icons">{endIconsElem}</div>;
     }
-
-    const closeDecl: IconButtonDecl = {
-        elemtype: "iconbutton",
-        icon: "xmark-large",
-        title: "Close",
-        click: (e) => {
-            e.stopPropagation();
-            uxCloseBlock(nodeModel.blockId);
-        },
-    };
-    endIconsElem.push(<IconButton key="close" decl={closeDecl} className="block-frame-default-close" />);
-
-    return <div className="block-frame-end-icons">{endIconsElem}</div>;
-});
+);
 HeaderEndIcons.displayName = "HeaderEndIcons";
 
 const BlockFrame_Header = ({
     nodeModel,
     viewModel,
+    headerTabs,
+    showAddTabButton,
+    onAddTab,
     preview,
     connBtnRef,
     changeConnModalAtom,
@@ -310,13 +339,23 @@ const BlockFrame_Header = ({
                     />
                 )}
                 {useTermHeader && badge && (
-                    <div className="pointer-events-none flex items-center px-1" style={{ color: badge.color || "#fbbf24" }}>
+                    <div
+                        className="pointer-events-none flex items-center px-1"
+                        style={{ color: badge.color || "#fbbf24" }}
+                    >
                         <i className={makeIconClass(badge.icon, true, { defaultIcon: "circle-small" })} />
                     </div>
                 )}
             </div>
             <HeaderTextElems viewModel={viewModel} blockId={nodeModel.blockId} preview={preview} error={error} />
-            <HeaderEndIcons viewModel={viewModel} nodeModel={nodeModel} blockId={nodeModel.blockId} />
+            <HeaderEndIcons
+                viewModel={viewModel}
+                nodeModel={nodeModel}
+                blockId={nodeModel.blockId}
+                headerTabs={headerTabs}
+                showAddTabButton={showAddTabButton}
+                onAddTab={onAddTab}
+            />
         </div>
     );
 };

@@ -21,6 +21,7 @@ import { isBlank, useAtomValueSafe } from "@/util/util";
 import clsx from "clsx";
 import { useAtomValue } from "jotai";
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useBlockTabs } from "./block-tabs";
 import "./block.scss";
 import { BlockEnv } from "./blockenv";
 import { BlockFrame } from "./blockframe";
@@ -100,7 +101,6 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
     const modalOpen = useAtomValue(waveEnv.atoms.modalOpen);
     const focusFollowsCursorMode = useAtomValue(waveEnv.getSettingsKeyAtom("app:focusfollowscursor")) ?? "off";
     const innerRect = useDebouncedNodeInnerRect(nodeModel);
-    const noPadding = useAtomValueSafe(viewModel.noPadding);
 
     useEffect(() => {
         return () => {
@@ -158,10 +158,18 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
         return retVal;
     }, [innerRect, disablePointerEvents, blockContentOffset]);
 
-    const viewElem = useMemo(
+    const rootViewElem = useMemo(
         () => getViewElem(nodeModel.blockId, blockRef, contentRef, blockView, viewModel),
         [nodeModel.blockId, blockView, viewModel]
     );
+    const tabState = useBlockTabs({
+        blockId: nodeModel.blockId,
+        nodeModel,
+        rootViewModel: viewModel,
+        rootContent: rootViewElem,
+    });
+    const effectiveViewModel = tabState.activeViewModel ?? viewModel;
+    const noPadding = useAtomValueSafe(effectiveViewModel.noPadding);
 
     const handleChildFocus = useCallback(
         (event: React.FocusEvent<HTMLDivElement, Element>) => {
@@ -179,18 +187,19 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
             cancelAnimationFrame(pendingFocusRafRef.current);
             pendingFocusRafRef.current = null;
         }
-        const ok = viewModel?.giveFocus?.();
-        if (ok) {
+        const activeViewModel = tabState.getActiveViewModel();
+        const delegatedOk = activeViewModel?.giveFocus?.();
+        if (delegatedOk) {
             return;
         }
         focusElemRef.current?.focus({ preventScroll: true });
         pendingFocusRafRef.current = requestAnimationFrame(() => {
             pendingFocusRafRef.current = null;
             if (blockRef.current?.contains(document.activeElement)) {
-                viewModel?.giveFocus?.();
+                tabState.getActiveViewModel()?.giveFocus?.();
             }
         });
-    }, [viewModel]);
+    }, [tabState]);
 
     const focusFromPointerEnter = useCallback(
         (event: React.PointerEvent<HTMLDivElement>) => {
@@ -234,6 +243,25 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
         [setBlockClickedTrue, focusFromPointerEnter, handleChildFocus, blockRef]
     );
 
+    useEffect(() => {
+        const bcm = getBlockComponentModel(nodeModel.blockId);
+        if (bcm == null) {
+            return;
+        }
+        bcm.getActiveViewModel = tabState.getActiveViewModel;
+        bcm.cycleSubTab = tabState.cycleToNextTab;
+        bcm.cleanupSubTabs = tabState.cleanupAllTabs;
+        return () => {
+            const nextBcm = getBlockComponentModel(nodeModel.blockId);
+            if (nextBcm == null) {
+                return;
+            }
+            nextBcm.getActiveViewModel = null;
+            nextBcm.cycleSubTab = null;
+            nextBcm.cleanupSubTabs = null;
+        };
+    }, [nodeModel.blockId, tabState]);
+
     return (
         <BlockFrame
             key={nodeModel.blockId}
@@ -241,6 +269,10 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
             preview={false}
             blockModel={blockModel}
             viewModel={viewModel}
+            headerViewModel={effectiveViewModel}
+            headerTabs={tabState.headerTabs}
+            showAddTabButton={tabState.showAddTabButton}
+            onAddTab={tabState.addTab}
         >
             <div key="focuselem" className="block-focuselem">
                 <input
@@ -259,7 +291,7 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
                 style={blockContentStyle}
             >
                 <ErrorBoundary>
-                    <Suspense fallback={<CenteredDiv>Loading...</CenteredDiv>}>{viewElem}</Suspense>
+                    <Suspense fallback={<CenteredDiv>Loading...</CenteredDiv>}>{tabState.activeContent}</Suspense>
                 </ErrorBoundary>
             </div>
         </BlockFrame>

@@ -397,6 +397,9 @@ declare global {
     type BlockComponentModel = {
         openSwitchConnection?: () => void;
         viewModel: ViewModel;
+        getActiveViewModel?: (() => ViewModel) | null;
+        cycleSubTab?: (() => boolean) | null;
+        cleanupSubTabs?: (() => Promise<void>) | null;
     };
 
     type ConnStatusType = "connected" | "connecting" | "disconnected" | "error" | "init";

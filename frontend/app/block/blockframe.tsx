@@ -1,8 +1,8 @@
 // Copyright 2026, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { BlockModel } from "@/app/block/block-model";
 import { getBlockCloseBlockedFlashSeqAtom } from "@/app/block/block-close-guard";
+import { BlockModel } from "@/app/block/block-model";
 import { BlockFrame_Header } from "@/app/block/blockframe-header";
 import { blockViewToIcon, getViewIconElem, useTabBackground } from "@/app/block/blockutil";
 import { ConnStatusOverlay } from "@/app/block/connstatusoverlay";
@@ -24,83 +24,88 @@ import * as React from "react";
 import { BlockEnv } from "./blockenv";
 import { BlockFrameProps } from "./blocktypes";
 
-const BlockMask = React.memo(({ nodeModel, closeBlockedFlashSeq }: { nodeModel: NodeModel; closeBlockedFlashSeq: number }) => {
-    const waveEnv = useWaveEnv<BlockEnv>();
-    const tabModel = useTabModel();
-    const isFocused = jotai.useAtomValue(nodeModel.isFocused);
-    const isEphemeral = jotai.useAtomValue(nodeModel.isEphemeral);
-    const blockNum = jotai.useAtomValue(nodeModel.blockNum);
-    const isLayoutMode = jotai.useAtomValue(waveEnv.atoms.controlShiftDelayAtom);
-    const showOverlayBlockNums = jotai.useAtomValue(waveEnv.getSettingsKeyAtom("app:showoverlayblocknums")) ?? true;
-    const blockHighlight = jotai.useAtomValue(BlockModel.getInstance().getBlockHighlightAtom(nodeModel.blockId));
-    const frameActiveBorderColor = jotai.useAtomValue(
-        waveEnv.getBlockMetaKeyAtom(nodeModel.blockId, "frame:activebordercolor")
-    );
-    const frameBorderColor = jotai.useAtomValue(waveEnv.getBlockMetaKeyAtom(nodeModel.blockId, "frame:bordercolor"));
-    const [tabBorderColor, tabActiveBorderColor] = useTabBackground(waveEnv, tabModel.tabId);
-    const style: React.CSSProperties = {};
-    let showBlockMask = false;
+const BlockMask = React.memo(
+    ({ nodeModel, closeBlockedFlashSeq }: { nodeModel: NodeModel; closeBlockedFlashSeq: number }) => {
+        const waveEnv = useWaveEnv<BlockEnv>();
+        const tabModel = useTabModel();
+        const isFocused = jotai.useAtomValue(nodeModel.isFocused);
+        const isEphemeral = jotai.useAtomValue(nodeModel.isEphemeral);
+        const blockNum = jotai.useAtomValue(nodeModel.blockNum);
+        const isLayoutMode = jotai.useAtomValue(waveEnv.atoms.controlShiftDelayAtom);
+        const showOverlayBlockNums = jotai.useAtomValue(waveEnv.getSettingsKeyAtom("app:showoverlayblocknums")) ?? true;
+        const blockHighlight = jotai.useAtomValue(BlockModel.getInstance().getBlockHighlightAtom(nodeModel.blockId));
+        const frameActiveBorderColor = jotai.useAtomValue(
+            waveEnv.getBlockMetaKeyAtom(nodeModel.blockId, "frame:activebordercolor")
+        );
+        const frameBorderColor = jotai.useAtomValue(
+            waveEnv.getBlockMetaKeyAtom(nodeModel.blockId, "frame:bordercolor")
+        );
+        const [tabBorderColor, tabActiveBorderColor] = useTabBackground(waveEnv, tabModel.tabId);
+        const style: React.CSSProperties = {};
+        let showBlockMask = false;
 
-    if (isFocused) {
-        if (tabActiveBorderColor) {
-            style.borderColor = tabActiveBorderColor;
+        if (isFocused) {
+            if (tabActiveBorderColor) {
+                style.borderColor = tabActiveBorderColor;
+            }
+            if (frameActiveBorderColor) {
+                style.borderColor = frameActiveBorderColor;
+            }
+        } else {
+            if (tabBorderColor) {
+                style.borderColor = tabBorderColor;
+            }
+            if (frameBorderColor) {
+                style.borderColor = frameBorderColor;
+            }
+            if (isEphemeral && !style.borderColor) {
+                style.borderColor = "rgba(255, 255, 255, 0.7)";
+            }
         }
-        if (frameActiveBorderColor) {
-            style.borderColor = frameActiveBorderColor;
-        }
-    } else {
-        if (tabBorderColor) {
-            style.borderColor = tabBorderColor;
-        }
-        if (frameBorderColor) {
-            style.borderColor = frameBorderColor;
-        }
-        if (isEphemeral && !style.borderColor) {
-            style.borderColor = "rgba(255, 255, 255, 0.7)";
-        }
-    }
 
-    if (blockHighlight && !style.borderColor) {
-        style.borderColor = "rgb(59, 130, 246)";
-    }
-    (style as Record<string, string>)["--block-mask-flash-color"] =
-        frameActiveBorderColor ?? tabActiveBorderColor ?? "var(--accent-color)";
+        if (blockHighlight && !style.borderColor) {
+            style.borderColor = "rgb(59, 130, 246)";
+        }
+        (style as Record<string, string>)["--block-mask-flash-color"] =
+            frameActiveBorderColor ?? tabActiveBorderColor ?? "var(--accent-color)";
 
-    let innerElem = null;
-    if (isLayoutMode && showOverlayBlockNums) {
-        showBlockMask = true;
-        innerElem = (
-            <div className="block-mask-inner">
-                <div className="bignum">{blockNum}</div>
+        let innerElem = null;
+        if (isLayoutMode && showOverlayBlockNums) {
+            showBlockMask = true;
+            innerElem = (
+                <div className="block-mask-inner">
+                    <div className="bignum">{blockNum}</div>
+                </div>
+            );
+        } else if (blockHighlight) {
+            showBlockMask = true;
+            const iconClass = makeIconClass(blockHighlight.icon, false);
+            innerElem = (
+                <div className="block-mask-inner">
+                    <i className={iconClass} style={{ fontSize: "48px", opacity: 0.5 }} />
+                </div>
+            );
+        }
+
+        return (
+            <div
+                className={clsx("block-mask", {
+                    "show-block-mask": showBlockMask,
+                    "bg-blue-500/10": blockHighlight,
+                    "close-blocked-flash": closeBlockedFlashSeq > 0,
+                })}
+                style={style}
+            >
+                {innerElem}
             </div>
         );
-    } else if (blockHighlight) {
-        showBlockMask = true;
-        const iconClass = makeIconClass(blockHighlight.icon, false);
-        innerElem = (
-            <div className="block-mask-inner">
-                <i className={iconClass} style={{ fontSize: "48px", opacity: 0.5 }} />
-            </div>
-        );
     }
-
-    return (
-        <div
-            className={clsx("block-mask", {
-                "show-block-mask": showBlockMask,
-                "bg-blue-500/10": blockHighlight,
-                "close-blocked-flash": closeBlockedFlashSeq > 0,
-            })}
-            style={style}
-        >
-            {innerElem}
-        </div>
-    );
-});
+);
 
 const BlockFrame_Default_Component = (props: BlockFrameProps) => {
     const waveEnv = useWaveEnv<BlockEnv>();
-    const { nodeModel, viewModel, blockModel, preview, numBlocksInTab, children } = props;
+    const { nodeModel, viewModel, headerViewModel, blockModel, preview, numBlocksInTab, children } = props;
+    const effectiveHeaderViewModel = headerViewModel ?? viewModel;
     const isFocused = jotai.useAtomValue(nodeModel.isFocused);
     const aiPanelVisible = jotai.useAtomValue(WorkspaceLayoutModel.getInstance().panelVisibleAtom);
     const metaView = jotai.useAtomValue(waveEnv.getBlockMetaKeyAtom(nodeModel.blockId, "view"));
@@ -170,7 +175,12 @@ const BlockFrame_Default_Component = (props: BlockFrameProps) => {
     }
     const previewElem = <div className="block-frame-preview">{viewIconElem}</div>;
     const headerElem = (
-        <BlockFrame_Header {...props} connBtnRef={connBtnRef} changeConnModalAtom={changeConnModalAtom} />
+        <BlockFrame_Header
+            {...props}
+            viewModel={effectiveHeaderViewModel}
+            connBtnRef={connBtnRef}
+            changeConnModalAtom={changeConnModalAtom}
+        />
     );
     const headerElemNoView = React.cloneElement(headerElem, { viewModel: null });
     return (
@@ -195,7 +205,11 @@ const BlockFrame_Default_Component = (props: BlockFrameProps) => {
             }
             inert={preview || undefined}
         >
-            <BlockMask key={`block-mask-${closeBlockedFlashSeq}`} nodeModel={nodeModel} closeBlockedFlashSeq={closeBlockedFlashSeq} />
+            <BlockMask
+                key={`block-mask-${closeBlockedFlashSeq}`}
+                nodeModel={nodeModel}
+                closeBlockedFlashSeq={closeBlockedFlashSeq}
+            />
             {preview || viewModel == null || !manageConnection ? null : (
                 <ConnStatusOverlay
                     nodeModel={nodeModel}

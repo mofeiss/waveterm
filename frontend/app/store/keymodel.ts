@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { WaveAIModel } from "@/app/aipanel/waveai-model";
+import { confirmCloseForMultiTabBlock } from "@/app/block/block-close-confirm";
 import { guardCloseForLockedBlock } from "@/app/block/block-close-guard";
 import { FocusManager } from "@/app/store/focusManager";
 import {
@@ -159,38 +160,49 @@ function simpleCloseStaticTab() {
 }
 
 function closeBlockIgnoringLock(blockId: string) {
+    const bcm = getBlockComponentModel(blockId);
     const workspaceLayoutModel = WorkspaceLayoutModel.getInstance();
     const isAIPanelOpen = workspaceLayoutModel.getAIPanelVisible();
-    if (isAIPanelOpen && getStaticTabBlockCount() === 1) {
-        const aiModel = WaveAIModel.getInstance();
-        const shouldSwitchToAI = !globalStore.get(aiModel.isChatEmptyAtom) || aiModel.hasNonEmptyInput();
-        if (shouldSwitchToAI) {
-            replaceBlock(blockId, { meta: { view: "launcher" } }, false);
-            setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
+    fireAndForget(async () => {
+        const confirmed = await confirmCloseForMultiTabBlock(blockId);
+        if (!confirmed) {
             return;
         }
-    }
 
-    const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId));
-    const blockData = globalStore.get(blockAtom);
-    const isAIFileDiff = blockData?.meta?.view === "aifilediff";
-
-    // If this is the last block, closing it will close the tab — route through simpleCloseStaticTab
-    // so the tab:confirmclose setting is respected.
-    if (getStaticTabBlockCount() === 1) {
-        simpleCloseStaticTab();
-        return;
-    }
-
-    const layoutModel = getLayoutModelForStaticTab();
-    const node = layoutModel.getNodeByBlockId(blockId);
-    if (node) {
-        fireAndForget(() => layoutModel.closeNode(node.id));
-
-        if (isAIFileDiff && isAIPanelOpen) {
-            setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
+        if (isAIPanelOpen && getStaticTabBlockCount() === 1) {
+            const aiModel = WaveAIModel.getInstance();
+            const shouldSwitchToAI = !globalStore.get(aiModel.isChatEmptyAtom) || aiModel.hasNonEmptyInput();
+            if (shouldSwitchToAI) {
+                await bcm?.cleanupSubTabs?.();
+                await replaceBlock(blockId, { meta: { view: "launcher" } }, false);
+                setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
+                return;
+            }
         }
-    }
+
+        const blockAtom = WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId));
+        const blockData = globalStore.get(blockAtom);
+        const isAIFileDiff = blockData?.meta?.view === "aifilediff";
+
+        // If this is the last block, closing it will close the tab — route through simpleCloseStaticTab
+        // so the tab:confirmclose setting is respected.
+        if (getStaticTabBlockCount() === 1) {
+            await bcm?.cleanupSubTabs?.();
+            simpleCloseStaticTab();
+            return;
+        }
+
+        const layoutModel = getLayoutModelForStaticTab();
+        const node = layoutModel.getNodeByBlockId(blockId);
+        if (node) {
+            await bcm?.cleanupSubTabs?.();
+            await layoutModel.closeNode(node.id);
+
+            if (isAIFileDiff && isAIPanelOpen) {
+                setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
+            }
+        }
+    });
 }
 
 function uxCloseBlock(blockId: string) {
@@ -221,8 +233,16 @@ function genericClose() {
         const shouldSwitchToAI = !globalStore.get(aiModel.isChatEmptyAtom) || aiModel.hasNonEmptyInput();
         if (shouldSwitchToAI) {
             if (focusedNode) {
-                replaceBlock(focusedNode.data.blockId, { meta: { view: "launcher" } }, false);
-                setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
+                const bcm = getBlockComponentModel(focusedNode.data.blockId);
+                fireAndForget(async () => {
+                    const confirmed = await confirmCloseForMultiTabBlock(focusedNode.data.blockId);
+                    if (!confirmed) {
+                        return;
+                    }
+                    await bcm?.cleanupSubTabs?.();
+                    await replaceBlock(focusedNode.data.blockId, { meta: { view: "launcher" } }, false);
+                    setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
+                });
                 return;
             }
         }
@@ -236,7 +256,17 @@ function genericClose() {
     // If this is the last block, closing it will close the tab — route through simpleCloseStaticTab
     // so the tab:confirmclose setting is respected.
     if (blockCount === 1) {
-        simpleCloseStaticTab();
+        const bcm = focusedBlockId != null ? getBlockComponentModel(focusedBlockId) : null;
+        fireAndForget(async () => {
+            if (focusedBlockId != null) {
+                const confirmed = await confirmCloseForMultiTabBlock(focusedBlockId);
+                if (!confirmed) {
+                    return;
+                }
+            }
+            await bcm?.cleanupSubTabs?.();
+            simpleCloseStaticTab();
+        });
         return;
     }
 
@@ -245,7 +275,17 @@ function genericClose() {
     const blockData = blockAtom ? globalStore.get(blockAtom) : null;
     const isAIFileDiff = blockData?.meta?.view === "aifilediff";
 
-    fireAndForget(layoutModel.closeFocusedNode.bind(layoutModel));
+    fireAndForget(async () => {
+        if (blockId != null) {
+            const confirmed = await confirmCloseForMultiTabBlock(blockId);
+            if (!confirmed) {
+                return;
+            }
+            const bcm = getBlockComponentModel(blockId);
+            await bcm?.cleanupSubTabs?.();
+        }
+        await layoutModel.closeFocusedNode.bind(layoutModel)();
+    });
 
     if (isAIFileDiff && isAIPanelOpen) {
         setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
@@ -446,6 +486,13 @@ function appHandleKeyDown(waveEvent: WaveKeyboardEvent): boolean {
         return false;
     }
     lastHandledEvent = nativeEvent;
+    if (isTabWindow()) {
+        const focusedBlockId = getFocusedBlockId();
+        const focusedBcm = focusedBlockId != null ? getBlockComponentModel(focusedBlockId) : null;
+        if (focusedBcm?.cycleSubTab != null && keyutil.checkKeyPressed(waveEvent, "Ctrl:Tab")) {
+            return focusedBcm.cycleSubTab();
+        }
+    }
     if (activeChord) {
         console.log("handle activeChord", activeChord);
         // If we're in chord mode, look for the second key.
@@ -479,7 +526,7 @@ function appHandleKeyDown(waveEvent: WaveKeyboardEvent): boolean {
         const blockId = focusedNode?.data?.blockId;
         if (blockId != null && shouldDispatchToBlock(waveEvent)) {
             const bcm = getBlockComponentModel(blockId);
-            const viewModel = bcm?.viewModel;
+            const viewModel = bcm?.getActiveViewModel?.() ?? bcm?.viewModel;
             if (viewModel?.keyDownHandler) {
                 const handledByBlock = viewModel.keyDownHandler(waveEvent);
                 if (handledByBlock) {
@@ -797,19 +844,20 @@ function registerGlobalKeys() {
     }
     function activateSearch(event: WaveKeyboardEvent): boolean {
         const bcm = getBlockComponentModel(getFocusedBlockInStaticTab());
+        const viewModel = bcm?.getActiveViewModel?.() ?? bcm?.viewModel;
         // Ctrl+f is reserved in most shells
-        if (event.control && bcm.viewModel.viewType == "term") {
+        if (event.control && viewModel?.viewType == "term") {
             return false;
         }
-        if (bcm.viewModel.searchAtoms) {
-            if (globalStore.get(bcm.viewModel.searchAtoms.isOpen)) {
+        if (viewModel?.searchAtoms) {
+            if (globalStore.get(viewModel.searchAtoms.isOpen)) {
                 // Already open — increment the focusInput counter so this block's
                 // SearchComponent focuses its own input (avoids a global DOM query
                 // that could target the wrong block when multiple searches are open).
-                const cur = globalStore.get(bcm.viewModel.searchAtoms.focusInput) as number;
-                globalStore.set(bcm.viewModel.searchAtoms.focusInput, cur + 1);
+                const cur = globalStore.get(viewModel.searchAtoms.focusInput) as number;
+                globalStore.set(viewModel.searchAtoms.focusInput, cur + 1);
             } else {
-                globalStore.set(bcm.viewModel.searchAtoms.isOpen, true);
+                globalStore.set(viewModel.searchAtoms.isOpen, true);
             }
             return true;
         }
@@ -817,8 +865,9 @@ function registerGlobalKeys() {
     }
     function deactivateSearch(): boolean {
         const bcm = getBlockComponentModel(getFocusedBlockInStaticTab());
-        if (bcm.viewModel.searchAtoms && globalStore.get(bcm.viewModel.searchAtoms.isOpen)) {
-            globalStore.set(bcm.viewModel.searchAtoms.isOpen, false);
+        const viewModel = bcm?.getActiveViewModel?.() ?? bcm?.viewModel;
+        if (viewModel?.searchAtoms && globalStore.get(viewModel.searchAtoms.isOpen)) {
+            globalStore.set(viewModel.searchAtoms.isOpen, false);
             return true;
         }
         return false;
@@ -841,7 +890,7 @@ function registerGlobalKeys() {
     });
     const allKeys = Array.from(globalKeyMap.keys());
     // special case keys, handled by web view
-    allKeys.push("Cmd:l", "Cmd:r", "Cmd:ArrowRight", "Cmd:ArrowLeft", "Cmd:o");
+    allKeys.push("Cmd:l", "Cmd:r", "Cmd:ArrowRight", "Cmd:ArrowLeft", "Cmd:o", "Ctrl:Tab");
     getApi().registerGlobalWebviewKeys(allKeys);
 
     const splitBlockKeys = new Map<string, KeyHandler>();
@@ -880,7 +929,9 @@ function getAllGlobalKeyBindings(): string[] {
 
 export {
     appHandleKeyDown,
+    clearActiveZoomBlockId,
     clearPanelFocus,
+    closeBlockIgnoringLock,
     disableGlobalKeybindings,
     enableGlobalKeybindings,
     getSimpleControlShiftAtom,
@@ -891,8 +942,6 @@ export {
     registerElectronReinjectKeyHandler,
     registerGlobalKeys,
     registerZoomCommandHandler,
-    clearActiveZoomBlockId,
-    closeBlockIgnoringLock,
     setActiveZoomBlockId,
     tryReinjectKey,
     unsetControlShift,

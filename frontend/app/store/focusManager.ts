@@ -102,7 +102,8 @@ export class FocusManager {
         layoutModel.focusNode(lnode.id);
         const blockId = lnode.data.blockId;
         const bcm = getBlockComponentModel(blockId);
-        const ok = bcm?.viewModel?.giveFocus?.();
+        const viewModel = bcm?.getActiveViewModel?.() ?? bcm?.viewModel;
+        const ok = viewModel?.giveFocus?.();
         if (!ok) {
             const inputElem = document.getElementById(`${blockId}-dummy-focus`);
             inputElem?.focus();

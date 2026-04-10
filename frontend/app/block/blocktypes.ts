@@ -44,6 +44,10 @@ export interface BlockFrameProps {
     blockModel?: BlockComponentModel2;
     nodeModel?: NodeModel;
     viewModel?: ViewModel;
+    headerViewModel?: ViewModel;
+    headerTabs?: React.ReactNode;
+    showAddTabButton?: boolean;
+    onAddTab?: (view: "term" | "web" | "preview") => Promise<void> | void;
     preview: boolean;
     numBlocksInTab?: number;
     children?: React.ReactNode;

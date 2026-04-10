@@ -1109,6 +1109,8 @@ declare global {
         "frame:icon"?: string;
         "frame:text"?: string;
         "frame:closelocked"?: boolean;
+        "blocktabs:ids"?: string[];
+        "blocktabs:activeid"?: string;
         "cmd:*"?: boolean;
         cmd?: string;
         "cmd:interactive"?: boolean;
