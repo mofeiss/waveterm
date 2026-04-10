@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+    getBlockCloseLockedAtom,
+    toggleBlockCloseLocked,
+} from "@/app/block/block-close-guard";
+import {
     blockViewToIcon,
     blockViewToName,
     getViewIconElem,
@@ -19,7 +23,7 @@ import {
     WOS,
 } from "@/app/store/global";
 import { globalStore } from "@/app/store/jotaiStore";
-import { uxCloseBlock } from "@/app/store/keymodel";
+import { closeBlockIgnoringLock, uxCloseBlock } from "@/app/store/keymodel";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
 import { useWaveEnv } from "@/app/waveenv/waveenv";
 import { IconButton } from "@/element/iconbutton";
@@ -62,7 +66,7 @@ function handleHeaderContextMenu(
         { type: "separator" },
         {
             label: "Close Block",
-            click: () => uxCloseBlock(blockId),
+            click: () => closeBlockIgnoringLock(blockId),
         }
     );
     blockEnv.showContextMenu(menu, e);
@@ -120,6 +124,7 @@ type HeaderEndIconsProps = {
 
 const HeaderEndIcons = React.memo(({ viewModel, nodeModel, blockId }: HeaderEndIconsProps) => {
     const blockEnv = useWaveEnv<BlockEnv>();
+    const closeLocked = jotai.useAtomValue(getBlockCloseLockedAtom(blockId));
     const endIconButtons = util.useAtomValueSafe(viewModel?.endIconButtons);
     const magnified = jotai.useAtomValue(nodeModel.isMagnified);
     const ephemeral = jotai.useAtomValue(nodeModel.isEphemeral);
@@ -164,6 +169,22 @@ const HeaderEndIcons = React.memo(({ viewModel, nodeModel, blockId }: HeaderEndI
         endIconsElem.push(<IconButton key="split-horizontal" decl={splitHorizontalDecl} />);
         endIconsElem.push(<IconButton key="split-vertical" decl={splitVerticalDecl} />);
     }
+    const lockDecl: IconButtonDecl = {
+        elemtype: "iconbutton",
+        icon: closeLocked ? "lock" : "unlock",
+        title: closeLocked ? "Unlock Panel Close" : "Lock Panel Close",
+        click: (e) => {
+            e.stopPropagation();
+            toggleBlockCloseLocked(blockId);
+        },
+    };
+    endIconsElem.push(
+        <IconButton
+            key="close-lock"
+            decl={lockDecl}
+            className={cn("block-frame-close-lock", closeLocked && "block-frame-close-lock-locked")}
+        />
+    );
     const settingsDecl: IconButtonDecl = {
         elemtype: "iconbutton",
         icon: "cog",
@@ -199,7 +220,10 @@ const HeaderEndIcons = React.memo(({ viewModel, nodeModel, blockId }: HeaderEndI
         elemtype: "iconbutton",
         icon: "xmark-large",
         title: "Close",
-        click: () => uxCloseBlock(nodeModel.blockId),
+        click: (e) => {
+            e.stopPropagation();
+            uxCloseBlock(nodeModel.blockId);
+        },
     };
     endIconsElem.push(<IconButton key="close" decl={closeDecl} className="block-frame-default-close" />);
 

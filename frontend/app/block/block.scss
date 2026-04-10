@@ -251,6 +251,10 @@
                             }
                         }
                     }
+
+                    .block-frame-close-lock-locked {
+                        color: var(--accent-color);
+                    }
                 }
             }
 
@@ -409,6 +413,10 @@
             border-radius: var(--block-border-radius);
             z-index: var(--zindex-block-mask-inner);
 
+            &.close-blocked-flash {
+                animation: block-close-blocked-flash 780ms ease-in-out 1;
+            }
+
             &.show-block-mask {
                 user-select: none;
                 pointer-events: auto;
@@ -444,5 +452,29 @@
                 }
             }
         }
+    }
+}
+
+@keyframes block-close-blocked-flash {
+    0%,
+    100% {
+        background-color: transparent;
+        box-shadow: none;
+    }
+
+    15%,
+    45%,
+    75% {
+        border-color: var(--block-mask-flash-color);
+        background-color: rgb(from var(--block-mask-flash-color) r g b / 16%);
+        box-shadow: inset 0 0 0 1px rgb(from var(--block-mask-flash-color) r g b / 38%);
+    }
+
+    30%,
+    60%,
+    90% {
+        border-color: transparent;
+        background-color: transparent;
+        box-shadow: none;
     }
 }

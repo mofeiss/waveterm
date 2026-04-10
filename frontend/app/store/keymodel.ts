@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { WaveAIModel } from "@/app/aipanel/waveai-model";
+import { guardCloseForLockedBlock } from "@/app/block/block-close-guard";
 import { FocusManager } from "@/app/store/focusManager";
 import {
     atoms,
@@ -147,7 +148,7 @@ function simpleCloseStaticTab() {
         });
 }
 
-function uxCloseBlock(blockId: string) {
+function closeBlockIgnoringLock(blockId: string) {
     const workspaceLayoutModel = WorkspaceLayoutModel.getInstance();
     const isAIPanelOpen = workspaceLayoutModel.getAIPanelVisible();
     if (isAIPanelOpen && getStaticTabBlockCount() === 1) {
@@ -182,10 +183,24 @@ function uxCloseBlock(blockId: string) {
     }
 }
 
+function uxCloseBlock(blockId: string) {
+    if (guardCloseForLockedBlock(blockId)) {
+        return;
+    }
+    closeBlockIgnoringLock(blockId);
+}
+
 function genericClose() {
     const focusType = FocusManager.getInstance().getFocusType();
     if (focusType === "waveai") {
         WorkspaceLayoutModel.getInstance().setAIPanelVisible(false);
+        return;
+    }
+
+    const layoutModel = getLayoutModelForStaticTab();
+    const focusedNode = globalStore.get(layoutModel.focusedNode);
+    const focusedBlockId = focusedNode?.data?.blockId;
+    if (focusedBlockId != null && guardCloseForLockedBlock(focusedBlockId)) {
         return;
     }
 
@@ -195,8 +210,6 @@ function genericClose() {
         const aiModel = WaveAIModel.getInstance();
         const shouldSwitchToAI = !globalStore.get(aiModel.isChatEmptyAtom) || aiModel.hasNonEmptyInput();
         if (shouldSwitchToAI) {
-            const layoutModel = getLayoutModelForStaticTab();
-            const focusedNode = globalStore.get(layoutModel.focusedNode);
             if (focusedNode) {
                 replaceBlock(focusedNode.data.blockId, { meta: { view: "launcher" } }, false);
                 setTimeout(() => WaveAIModel.getInstance().focusInput(), 50);
@@ -217,8 +230,6 @@ function genericClose() {
         return;
     }
 
-    const layoutModel = getLayoutModelForStaticTab();
-    const focusedNode = globalStore.get(layoutModel.focusedNode);
     const blockId = focusedNode?.data?.blockId;
     const blockAtom = blockId ? WOS.getWaveObjectAtom<Block>(WOS.makeORef("block", blockId)) : null;
     const blockData = blockAtom ? globalStore.get(blockAtom) : null;
@@ -870,6 +881,7 @@ export {
     registerGlobalKeys,
     registerZoomCommandHandler,
     clearActiveZoomBlockId,
+    closeBlockIgnoringLock,
     setActiveZoomBlockId,
     tryReinjectKey,
     unsetControlShift,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { BlockModel } from "@/app/block/block-model";
+import { getBlockCloseBlockedFlashSeqAtom } from "@/app/block/block-close-guard";
 import { BlockFrame_Header } from "@/app/block/blockframe-header";
 import { blockViewToIcon, getViewIconElem, useTabBackground } from "@/app/block/blockutil";
 import { ConnStatusOverlay } from "@/app/block/connstatusoverlay";
@@ -23,7 +24,7 @@ import * as React from "react";
 import { BlockEnv } from "./blockenv";
 import { BlockFrameProps } from "./blocktypes";
 
-const BlockMask = React.memo(({ nodeModel }: { nodeModel: NodeModel }) => {
+const BlockMask = React.memo(({ nodeModel, closeBlockedFlashSeq }: { nodeModel: NodeModel; closeBlockedFlashSeq: number }) => {
     const waveEnv = useWaveEnv<BlockEnv>();
     const tabModel = useTabModel();
     const isFocused = jotai.useAtomValue(nodeModel.isFocused);
@@ -62,6 +63,8 @@ const BlockMask = React.memo(({ nodeModel }: { nodeModel: NodeModel }) => {
     if (blockHighlight && !style.borderColor) {
         style.borderColor = "rgb(59, 130, 246)";
     }
+    (style as Record<string, string>)["--block-mask-flash-color"] =
+        frameActiveBorderColor ?? tabActiveBorderColor ?? "var(--accent-color)";
 
     let innerElem = null;
     if (isLayoutMode && showOverlayBlockNums) {
@@ -83,7 +86,11 @@ const BlockMask = React.memo(({ nodeModel }: { nodeModel: NodeModel }) => {
 
     return (
         <div
-            className={clsx("block-mask", { "show-block-mask": showBlockMask, "bg-blue-500/10": blockHighlight })}
+            className={clsx("block-mask", {
+                "show-block-mask": showBlockMask,
+                "bg-blue-500/10": blockHighlight,
+                "close-blocked-flash": closeBlockedFlashSeq > 0,
+            })}
             style={style}
         >
             {innerElem}
@@ -106,6 +113,7 @@ const BlockFrame_Default_Component = (props: BlockFrameProps) => {
     const connModalOpen = jotai.useAtomValue(changeConnModalAtom);
     const isMagnified = jotai.useAtomValue(nodeModel.isMagnified);
     const isEphemeral = jotai.useAtomValue(nodeModel.isEphemeral);
+    const closeBlockedFlashSeq = jotai.useAtomValue(getBlockCloseBlockedFlashSeqAtom(nodeModel.blockId));
     const [magnifiedBlockBlurAtom] = React.useState(() =>
         waveEnv.getSettingsKeyAtom("window:magnifiedblockblurprimarypx")
     );
@@ -187,7 +195,7 @@ const BlockFrame_Default_Component = (props: BlockFrameProps) => {
             }
             inert={preview || undefined}
         >
-            <BlockMask nodeModel={nodeModel} />
+            <BlockMask key={`block-mask-${closeBlockedFlashSeq}`} nodeModel={nodeModel} closeBlockedFlashSeq={closeBlockedFlashSeq} />
             {preview || viewModel == null || !manageConnection ? null : (
                 <ConnStatusOverlay
                     nodeModel={nodeModel}
