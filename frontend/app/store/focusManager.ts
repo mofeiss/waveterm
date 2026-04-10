@@ -9,7 +9,7 @@ import { getLayoutModelForStaticTab } from "@/layout/index";
 import { focusedBlockId } from "@/util/focusutil";
 import { Atom, atom, type PrimitiveAtom } from "jotai";
 
-export type FocusStrType = "node" | "waveai";
+export type FocusStrType = "node" | "waveai" | "app";
 
 export class FocusManager {
     private static instance: FocusManager | null = null;
@@ -19,7 +19,7 @@ export class FocusManager {
 
     private constructor() {
         this.blockFocusAtom = atom((get) => {
-            if (get(this.focusType) == "waveai") {
+            if (get(this.focusType) !== "node") {
                 return null;
             }
             const layoutModel = getLayoutModelForStaticTab();
@@ -53,12 +53,20 @@ export class FocusManager {
         this.refocusNode();
     }
 
+    setAppFocus(force: boolean = false) {
+        const ftype = globalStore.get(this.focusType);
+        if (!force && ftype == "app") {
+            return;
+        }
+        globalStore.set(this.focusType, "app");
+    }
+
     waveAIFocusWithin(): boolean {
         return waveAIHasFocusWithin();
     }
 
     nodeFocusWithin(): boolean {
-        return focusedBlockId() != null;
+        return globalStore.get(this.focusType) === "node" && focusedBlockId() != null;
     }
 
     requestNodeFocus(): void {
@@ -69,6 +77,10 @@ export class FocusManager {
         globalStore.set(this.focusType, "waveai");
     }
 
+    requestAppFocus(): void {
+        globalStore.set(this.focusType, "app");
+    }
+
     getFocusType(): FocusStrType {
         return globalStore.get(this.focusType);
     }
@@ -77,6 +89,9 @@ export class FocusManager {
         const ftype = globalStore.get(this.focusType);
         if (ftype == "waveai") {
             WaveAIModel.getInstance().focusInput();
+            return;
+        }
+        if (ftype != "node") {
             return;
         }
         const layoutModel = getLayoutModelForStaticTab();

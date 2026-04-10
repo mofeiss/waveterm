@@ -18,7 +18,7 @@ import { Workspace } from "@/app/workspace/workspace";
 import { getLayoutModelForStaticTab } from "@/layout/index";
 import { ContextMenuModel } from "@/store/contextmenu";
 import { atoms, createBlock, getSettingsPrefixAtom, refocusNode } from "@/store/global";
-import { appHandleKeyDown, keyboardMouseDownHandler } from "@/store/keymodel";
+import { appHandleKeyDown, clearPanelFocus, keyboardMouseDownHandler } from "@/store/keymodel";
 import { getElemAsStr } from "@/util/focusutil";
 import * as keyutil from "@/util/keyutil";
 import { PLATFORM } from "@/util/platformutil";
@@ -204,6 +204,17 @@ function AppFocusHandler() {
     return null;
 }
 
+function targetHasAncestorWithAttribute(target: EventTarget | null, attrName: string): boolean {
+    let elem = target instanceof HTMLElement ? target : target instanceof Text ? target.parentElement : null;
+    while (elem != null) {
+        if (elem.hasAttribute(attrName)) {
+            return true;
+        }
+        elem = elem.parentElement;
+    }
+    return false;
+}
+
 const MacOSFirstClickHandler = () => {
     useEffect(() => {
         if (PLATFORM !== "darwin") {
@@ -376,6 +387,15 @@ const AppInner = () => {
                 "prefers-reduced-motion": prefersReducedMotion,
             })}
             onContextMenu={handleContextMenu}
+            onMouseDownCapture={(e) => {
+                if (
+                    targetHasAncestorWithAttribute(e.target, "data-blockid") ||
+                    targetHasAncestorWithAttribute(e.target, "data-aipanel")
+                ) {
+                    return;
+                }
+                clearPanelFocus();
+            }}
         >
             <AppBackground />
             <MacOSFirstClickHandler />

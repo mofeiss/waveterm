@@ -69,6 +69,16 @@ export function keyboardMouseDownHandler(e: MouseEvent) {
     }
 }
 
+function clearPanelFocus() {
+    FocusManager.getInstance().setAppFocus();
+    clearActiveZoomBlockId();
+    getApi().setWebviewFocus(null, null);
+    if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+    }
+    document.getSelection()?.removeAllRanges();
+}
+
 function getFocusedBlockInStaticTab(): string {
     const layoutModel = getLayoutModelForStaticTab();
     const focusedNode = globalStore.get(layoutModel.focusedNode);
@@ -870,6 +880,7 @@ function getAllGlobalKeyBindings(): string[] {
 
 export {
     appHandleKeyDown,
+    clearPanelFocus,
     disableGlobalKeybindings,
     enableGlobalKeybindings,
     getSimpleControlShiftAtom,

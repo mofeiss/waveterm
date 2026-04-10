@@ -5,6 +5,7 @@ import { AIPanel } from "@/app/aipanel/aipanel";
 import { ErrorBoundary } from "@/app/element/errorboundary";
 import { CenteredDiv } from "@/app/element/quickelems";
 import { ModalsRenderer } from "@/app/modals/modalsrenderer";
+import { clearPanelFocus } from "@/app/store/keymodel";
 import { TabBar } from "@/app/tab/tabbar";
 import { TabContent } from "@/app/tab/tabcontent";
 import { VTabBar } from "@/app/tab/vtabbar";
@@ -26,10 +27,11 @@ const MacOSTabBarSpacer = memo(() => {
     return (
         <div
             className="w-full shrink-0"
+            onMouseDown={clearPanelFocus}
             style={
                 {
                     height: "calc(8px * var(--zoomfactor-inv))",
-                    WebkitAppRegion: "drag",
+                    WebkitAppRegion: "no-drag",
                     backdropFilter: "blur(20px)",
                     background: "rgba(0, 0, 0, 0.35)",
                 } as React.CSSProperties

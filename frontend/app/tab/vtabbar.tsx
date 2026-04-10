@@ -3,6 +3,7 @@
 
 import { Tooltip } from "@/app/element/tooltip";
 import { getTabBadgeAtom } from "@/app/store/badge";
+import { clearPanelFocus } from "@/app/store/keymodel";
 import { getTabModelByTabId } from "@/app/store/tab-model";
 import { makeORef } from "@/app/store/wos";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
@@ -328,6 +329,7 @@ export function VTabBar({ workspace, className }: VTabBarProps) {
         <div
             className={cn("flex h-full flex-col overflow-hidden", className)}
             style={{ backdropFilter: "blur(20px)", background: "rgba(0, 0, 0, 0.35)" }}
+            onMouseDownCapture={clearPanelFocus}
             onContextMenu={handleTabBarContextMenu}
         >
             {env.isMacOS() && <MacOSHeader />}

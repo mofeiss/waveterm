@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Tooltip } from "@/app/element/tooltip";
+import { clearPanelFocus } from "@/app/store/keymodel";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
 import { useWaveEnv } from "@/app/waveenv/waveenv";
 import { WorkspaceLayoutModel } from "@/app/workspace/workspace-layout-model";
@@ -597,7 +598,7 @@ const TabBar = memo(({ workspace, noTabs }: TabBarProps) => {
     }
 
     return (
-        <div ref={tabbarWrapperRef} className="tab-bar-wrapper">
+        <div ref={tabbarWrapperRef} className="tab-bar-wrapper" onMouseDownCapture={clearPanelFocus}>
             <div
                 ref={draggerLeftRef}
                 className="h-full shrink-0 z-window-drag"
@@ -664,7 +665,11 @@ const TabBar = memo(({ workspace, noTabs }: TabBarProps) => {
             >
                 <i className="fa fa-solid fa-plus" />
             </button>
-            <div className="flex-1" />
+            <div
+                className="flex-1 h-full"
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+                onMouseDown={clearPanelFocus}
+            />
             <div ref={rightContainerRef} className="flex flex-row gap-1 items-end">
                 <UpdateStatusBanner />
                 <div
