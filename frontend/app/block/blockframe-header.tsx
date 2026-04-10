@@ -255,7 +255,11 @@ const BlockFrame_Header = ({
     const prevMagifiedState = React.useRef(magnified);
     const manageConnection = util.useAtomValueSafe(viewModel?.manageConnection);
     const iconColor = jotai.useAtomValue(waveEnv.getBlockMetaKeyAtom(nodeModel.blockId, "icon:color"));
-    const dragHandleRef = preview ? null : nodeModel.dragHandleRef;
+    const headerDragHandleStrategy = viewModel?.headerDragHandleStrategy ?? "full-header";
+    const fullHeaderDragHandleRef =
+        !preview && headerDragHandleStrategy === "full-header" ? nodeModel.dragHandleRef : undefined;
+    const leadingDragHandleRef =
+        !preview && headerDragHandleStrategy === "leading-only" ? nodeModel.dragHandleRef : undefined;
     const isTerminalBlock = metaView === "term";
     viewName = metaFrameTitle ?? viewName;
     viewIconUnion = metaFrameIcon ?? viewIconUnion;
@@ -274,41 +278,43 @@ const BlockFrame_Header = ({
         <div
             className={cn("block-frame-default-header", useTermHeader && "!pl-[2px]")}
             data-role="block-header"
-            ref={dragHandleRef}
+            ref={fullHeaderDragHandleRef}
             onContextMenu={(e) => handleHeaderContextMenu(e, nodeModel.blockId, viewModel, nodeModel, waveEnv)}
         >
-            {!useTermHeader && (
-                <>
-                    {preIconButton && <IconButton decl={preIconButton} className="block-frame-preicon-button" />}
-                    <div className="block-frame-default-header-iconview">
-                        {viewIconElem}
-                        {viewName && !hideViewName && <div className="block-frame-view-type">{viewName}</div>}
+            <div className="block-frame-header-leading" ref={leadingDragHandleRef}>
+                {!useTermHeader && (
+                    <>
+                        {preIconButton && <IconButton decl={preIconButton} className="block-frame-preicon-button" />}
+                        <div className="block-frame-default-header-iconview">
+                            {viewIconElem}
+                            {viewName && !hideViewName && <div className="block-frame-view-type">{viewName}</div>}
+                        </div>
+                    </>
+                )}
+                {manageConnection && (
+                    <ConnectionButton
+                        ref={connBtnRef}
+                        key="connbutton"
+                        connection={metaConnection}
+                        changeConnModalAtom={changeConnModalAtom}
+                        isTerminalBlock={isTerminalBlock}
+                    />
+                )}
+                {useTermHeader && termConfigedDurable != null && (
+                    <DurableSessionFlyover
+                        key="durable-status"
+                        blockId={nodeModel.blockId}
+                        viewModel={viewModel}
+                        placement="bottom"
+                        divClassName="iconbutton disabled text-[13px] ml-[-4px]"
+                    />
+                )}
+                {useTermHeader && badge && (
+                    <div className="pointer-events-none flex items-center px-1" style={{ color: badge.color || "#fbbf24" }}>
+                        <i className={makeIconClass(badge.icon, true, { defaultIcon: "circle-small" })} />
                     </div>
-                </>
-            )}
-            {manageConnection && (
-                <ConnectionButton
-                    ref={connBtnRef}
-                    key="connbutton"
-                    connection={metaConnection}
-                    changeConnModalAtom={changeConnModalAtom}
-                    isTerminalBlock={isTerminalBlock}
-                />
-            )}
-            {useTermHeader && termConfigedDurable != null && (
-                <DurableSessionFlyover
-                    key="durable-status"
-                    blockId={nodeModel.blockId}
-                    viewModel={viewModel}
-                    placement="bottom"
-                    divClassName="iconbutton disabled text-[13px] ml-[-4px]"
-                />
-            )}
-            {useTermHeader && badge && (
-                <div className="pointer-events-none flex items-center px-1" style={{ color: badge.color || "#fbbf24" }}>
-                    <i className={makeIconClass(badge.icon, true, { defaultIcon: "circle-small" })} />
-                </div>
-            )}
+                )}
+            </div>
             <HeaderTextElems viewModel={viewModel} blockId={nodeModel.blockId} preview={preview} error={error} />
             <HeaderEndIcons viewModel={viewModel} nodeModel={nodeModel} blockId={nodeModel.blockId} />
         </div>

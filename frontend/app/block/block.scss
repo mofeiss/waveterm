@@ -66,54 +66,62 @@
         position: relative;
         padding: 1px;
 
-        .block-frame-default-inner {
-            background-color: var(--block-bg-color);
-            width: 100%;
-            height: 100%;
-            border-radius: var(--block-border-radius);
-            display: flex;
-            flex-direction: column;
-
-            .block-frame-default-header {
-                max-height: var(--header-height);
-                min-height: var(--header-height);
+            .block-frame-default-inner {
+                background-color: var(--block-bg-color);
+                width: 100%;
+                height: 100%;
+                border-radius: var(--block-border-radius);
                 display: flex;
-                padding: 4px 5px 4px 7px;
-                align-items: center;
-                gap: 8px;
-                font: var(--header-font);
-                border-bottom: 1px solid var(--border-color);
-                border-radius: var(--block-border-radius) var(--block-border-radius) 0 0;
+                flex-direction: column;
 
-                .block-frame-default-header-iconview {
+                .block-frame-default-header {
+                    max-height: var(--header-height);
+                    min-height: var(--header-height);
                     display: flex;
-                    flex-shrink: 3;
-                    min-width: 17px;
+                    padding: 4px 5px 4px 7px;
                     align-items: center;
                     gap: 8px;
-                    overflow-x: hidden;
+                    font: var(--header-font);
+                    border-bottom: 1px solid var(--border-color);
+                    border-radius: var(--block-border-radius) var(--block-border-radius) 0 0;
 
-                    .block-frame-view-icon {
-                        font-size: var(--header-icon-size);
-                        opacity: 0.5;
-                        width: var(--header-icon-width);
-                        i {
-                            margin-right: 0;
+                    .block-frame-header-leading {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        min-width: 0;
+                        flex-shrink: 0;
+                    }
+
+                    .block-frame-default-header-iconview {
+                        display: flex;
+                        flex-shrink: 3;
+                        min-width: 17px;
+                        align-items: center;
+                        gap: 8px;
+                        overflow-x: hidden;
+
+                        .block-frame-view-icon {
+                            font-size: var(--header-icon-size);
+                            opacity: 0.5;
+                            width: var(--header-icon-width);
+                            i {
+                                margin-right: 0;
+                            }
+                        }
+
+                        .block-frame-view-type {
+                            overflow-x: hidden;
+                            text-wrap: nowrap;
+                            text-overflow: ellipsis;
+                            flex-shrink: 1;
+                            min-width: 0;
+                        }
+
+                        .block-frame-blockid {
+                            opacity: 0.5;
                         }
                     }
-
-                    .block-frame-view-type {
-                        overflow-x: hidden;
-                        text-wrap: nowrap;
-                        text-overflow: ellipsis;
-                        flex-shrink: 1;
-                        min-width: 0;
-                    }
-
-                    .block-frame-blockid {
-                        opacity: 0.5;
-                    }
-                }
 
                 .block-frame-text {
                     font: var(--fixed-font);

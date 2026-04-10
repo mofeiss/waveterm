@@ -311,6 +311,9 @@ declare global {
         // The type of view, used for identifying and rendering the appropriate component.
         viewType: string;
 
+        // Controls which area of the header can initiate layout dragging.
+        headerDragHandleStrategy?: "full-header" | "leading-only";
+
         useTermHeader?: jotai.Atom<boolean>;
 
         hideViewName?: jotai.Atom<boolean>;

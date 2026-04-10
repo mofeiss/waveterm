@@ -61,6 +61,7 @@ function getWebviewPreloadUrl(env: WebViewEnv) {
 
 export class WebViewModel implements ViewModel {
     viewType: string;
+    headerDragHandleStrategy: "leading-only";
     blockId: string;
     tabModel: TabModel;
     noPadding?: Atom<boolean>;
@@ -96,6 +97,7 @@ export class WebViewModel implements ViewModel {
         this.nodeModel = nodeModel;
         this.tabModel = tabModel;
         this.viewType = "web";
+        this.headerDragHandleStrategy = "leading-only";
         this.blockId = blockId;
         this.env = waveEnv;
         this.noPadding = atom(true);
