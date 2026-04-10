@@ -291,7 +291,7 @@ const BlockFull = memo(({ nodeModel, viewModel }: FullBlockProps) => {
                 style={blockContentStyle}
             >
                 <ErrorBoundary>
-                    <Suspense fallback={<CenteredDiv>Loading...</CenteredDiv>}>{tabState.activeContent}</Suspense>
+                    <Suspense fallback={<CenteredDiv>Loading...</CenteredDiv>}>{tabState.tabContents}</Suspense>
                 </ErrorBoundary>
             </div>
         </BlockFrame>

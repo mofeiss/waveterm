@@ -30,6 +30,21 @@
         }
     }
 
+    .block-tab-panel {
+        position: absolute;
+        inset: 0;
+        min-width: 0;
+        min-height: 0;
+
+        &.is-active {
+            display: flex;
+        }
+
+        &.is-hidden {
+            display: none;
+        }
+    }
+
     .block-focuselem {
         height: 0;
         width: 0;

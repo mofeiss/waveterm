@@ -15,9 +15,8 @@ import { makeIconClass } from "@/util/util";
 import * as jotai from "jotai";
 import * as React from "react";
 import { BlockEnv } from "./blockenv";
+import { getMountedBlockTabIds, ROOT_TAB_ID } from "./block-tabs-util";
 import { BlockNodeModel } from "./blocktypes";
-
-const ROOT_TAB_ID = "__root__";
 const BLOCK_TABS_IDS_METAKEY = "blocktabs:ids";
 const BLOCK_TABS_ACTIVE_METAKEY = "blocktabs:activeid";
 const SUPPORTED_BLOCK_TAB_VIEWS = new Set(["term", "web", "preview"]);
@@ -332,7 +331,7 @@ type UseBlockTabsRtn = {
     headerTabs: React.ReactNode;
     showAddTabButton: boolean;
     activeViewModel: ViewModel;
-    activeContent: React.ReactNode;
+    tabContents: React.ReactNode;
     addTab: (view: "term" | "web" | "preview") => Promise<void>;
     cycleToNextTab: () => boolean;
     cleanupAllTabs: () => Promise<void>;
@@ -364,10 +363,17 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
     const childTabIdsRef = React.useRef<string[]>(childTabIds);
     const activeTabIdRef = React.useRef(activeTabId);
     const [childViewModelRefreshSeq, setChildViewModelRefreshSeq] = React.useState(0);
+    const [mountedTabIds, setMountedTabIds] = React.useState<string[]>(() =>
+        getMountedBlockTabIds([ROOT_TAB_ID], activeTabId, childTabIds)
+    );
 
     React.useEffect(() => {
         childTabIdsRef.current = childTabIds;
         activeTabIdRef.current = activeTabId;
+    }, [activeTabId, childTabIds]);
+
+    React.useEffect(() => {
+        setMountedTabIds((prevMountedIds) => getMountedBlockTabIds(prevMountedIds, activeTabId, childTabIds));
     }, [activeTabId, childTabIds]);
 
     React.useEffect(() => {
@@ -570,28 +576,43 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
         return bcm?.getActiveViewModel?.() ?? bcm?.viewModel ?? rootViewModel;
     }, [activeTabId, childViewModelRefreshSeq, rootViewModel]);
 
-    const activeChildNodeModel = React.useMemo<BlockNodeModel | null>(() => {
-        if (activeTabId === ROOT_TAB_ID) {
-            return null;
-        }
-        return {
-            blockId: activeTabId,
-            isFocused: nodeModel.isFocused,
-            isMagnified: nodeModel.isMagnified,
-            onClose: () => {
-                void closeTab(activeTabId);
-            },
-            focusNode: nodeModel.focusNode,
-            toggleMagnify: nodeModel.toggleMagnify,
-        };
-    }, [activeTabId, closeTab, nodeModel]);
-
-    const activeContent =
-        activeTabId === ROOT_TAB_ID || activeChildNodeModel == null ? (
-            rootContent
-        ) : (
-            <SubBlock nodeModel={activeChildNodeModel} />
-        );
+    const tabContents = (
+        <>
+            {mountedTabIds.includes(ROOT_TAB_ID) && (
+                <div
+                    key={ROOT_TAB_ID}
+                    className={`block-tab-panel ${activeTabId === ROOT_TAB_ID ? "is-active" : "is-hidden"}`}
+                    aria-hidden={activeTabId !== ROOT_TAB_ID}
+                >
+                    {rootContent}
+                </div>
+            )}
+            {childTabIds
+                .filter((childId) => mountedTabIds.includes(childId))
+                .map((childId) => {
+                    const childNodeModel: BlockNodeModel = {
+                        blockId: childId,
+                        isFocused: nodeModel.isFocused,
+                        isMagnified: nodeModel.isMagnified,
+                        onClose: () => {
+                            void closeTab(childId);
+                        },
+                        focusNode: nodeModel.focusNode,
+                        toggleMagnify: nodeModel.toggleMagnify,
+                    };
+                    const isActive = activeTabId === childId;
+                    return (
+                        <div
+                            key={childId}
+                            className={`block-tab-panel ${isActive ? "is-active" : "is-hidden"}`}
+                            aria-hidden={!isActive}
+                        >
+                            <SubBlock nodeModel={childNodeModel} />
+                        </div>
+                    );
+                })}
+        </>
+    );
 
     const headerTabs = hasTabs ? (
         <BlockHeaderTabs
@@ -615,7 +636,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
         headerTabs,
         showAddTabButton,
         activeViewModel,
-        activeContent,
+        tabContents,
         addTab,
         cycleToNextTab,
         cleanupAllTabs,
