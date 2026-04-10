@@ -113,7 +113,14 @@ async function reinitWave() {
             window.removeEventListener("pointermove", cleanupNoHover, true);
             document.body.classList.remove("nohover");
         };
-        window.addEventListener("pointermove", cleanupNoHover, true);
+        // Arm the listener after the current click sequence settles so the
+        // tab-switch click itself cannot immediately re-enable hover.
+        setTimeout(() => {
+            if (cleanedUp) {
+                return;
+            }
+            window.addEventListener("pointermove", cleanupNoHover, true);
+        }, 75);
         setTimeout(cleanupNoHover, 1500);
     });
 
