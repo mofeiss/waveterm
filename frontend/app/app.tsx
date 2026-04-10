@@ -388,10 +388,7 @@ const AppInner = () => {
             })}
             onContextMenu={handleContextMenu}
             onMouseDownCapture={(e) => {
-                if (
-                    targetHasAncestorWithAttribute(e.target, "data-blockid") ||
-                    targetHasAncestorWithAttribute(e.target, "data-aipanel")
-                ) {
+                if (!targetHasAncestorWithAttribute(e.target, "data-clear-panel-focus")) {
                     return;
                 }
                 clearPanelFocus();

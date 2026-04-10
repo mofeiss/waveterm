@@ -3,7 +3,6 @@
 
 import { Tooltip } from "@/app/element/tooltip";
 import { getTabBadgeAtom } from "@/app/store/badge";
-import { clearPanelFocus } from "@/app/store/keymodel";
 import { getTabModelByTabId } from "@/app/store/tab-model";
 import { makeORef } from "@/app/store/wos";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
@@ -57,6 +56,7 @@ const MacOSHeader = memo(() => {
             {!isFullScreen && (
                 <div
                     className="w-full shrink-0"
+                    data-clear-panel-focus="true"
                     style={
                         {
                             height: "calc(25px * var(--zoomfactor-inv))",
@@ -329,7 +329,6 @@ export function VTabBar({ workspace, className }: VTabBarProps) {
         <div
             className={cn("flex h-full flex-col overflow-hidden", className)}
             style={{ backdropFilter: "blur(20px)", background: "rgba(0, 0, 0, 0.35)" }}
-            onMouseDownCapture={clearPanelFocus}
             onContextMenu={handleTabBarContextMenu}
         >
             {env.isMacOS() && <MacOSHeader />}

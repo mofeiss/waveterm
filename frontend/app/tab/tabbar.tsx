@@ -598,10 +598,11 @@ const TabBar = memo(({ workspace, noTabs }: TabBarProps) => {
     }
 
     return (
-        <div ref={tabbarWrapperRef} className="tab-bar-wrapper" onMouseDownCapture={clearPanelFocus}>
+        <div ref={tabbarWrapperRef} className="tab-bar-wrapper">
             <div
                 ref={draggerLeftRef}
                 className="h-full shrink-0 z-window-drag"
+                data-clear-panel-focus="true"
                 style={{ width: windowDragLeftWidth, WebkitAppRegion: "drag" } as any}
             />
             {showAppMenuButton && (
@@ -667,6 +668,7 @@ const TabBar = memo(({ workspace, noTabs }: TabBarProps) => {
             </button>
             <div
                 className="flex-1 h-full"
+                data-clear-panel-focus="true"
                 style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
                 onMouseDown={clearPanelFocus}
             />
@@ -674,6 +676,7 @@ const TabBar = memo(({ workspace, noTabs }: TabBarProps) => {
                 <UpdateStatusBanner />
                 <div
                     className="h-full shrink-0 z-window-drag"
+                    data-clear-panel-focus="true"
                     style={{ width: windowDragRightWidth, WebkitAppRegion: "drag" } as any}
                 />
             </div>

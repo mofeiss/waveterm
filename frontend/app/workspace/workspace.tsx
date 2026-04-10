@@ -28,6 +28,7 @@ const MacOSTabBarSpacer = memo(() => {
         <div
             className="w-full shrink-0"
             onMouseDown={clearPanelFocus}
+            data-clear-panel-focus="true"
             style={
                 {
                     height: "calc(8px * var(--zoomfactor-inv))",

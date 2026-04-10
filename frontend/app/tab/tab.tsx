@@ -184,6 +184,7 @@ const TabV = forwardRef<HTMLDivElement, TabVProps>((props, ref) => {
         if (event.button === 0 && !active) {
             onClick();
             selectedOnMouseDownRef.current = true;
+            return;
         }
         onDragStart(event);
     };

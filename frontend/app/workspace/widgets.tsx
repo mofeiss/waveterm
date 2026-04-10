@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Tooltip } from "@/app/element/tooltip";
+import { clearPanelFocus } from "@/app/store/keymodel";
 import { globalStore } from "@/app/store/jotaiStore";
 import { TabRpcClient } from "@/app/store/wshrpcutil";
 import { useWaveEnv, WaveEnv, WaveEnvSubset } from "@/app/waveenv/waveenv";
@@ -498,6 +499,11 @@ const Widgets = memo(() => {
                 ref={containerRef}
                 className="flex flex-col w-12 overflow-hidden py-1 -ml-1 select-none shrink-0"
                 onContextMenu={handleWidgetsBarContextMenu}
+                onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) {
+                        clearPanelFocus();
+                    }
+                }}
             >
                 {mode === "supercompact" ? (
                     <>
@@ -506,7 +512,7 @@ const Widgets = memo(() => {
                                 <Widget key={`widget-${idx}`} widget={data} mode={mode} env={env} />
                             ))}
                         </div>
-                        <div className="flex-grow" />
+                        <div className="flex-grow" data-clear-panel-focus="true" onMouseDown={clearPanelFocus} />
                         <div className="grid grid-cols-2 gap-0 w-full">
                             {env.isDev() || featureWaveAppBuilder ? (
                                 <div
@@ -546,7 +552,7 @@ const Widgets = memo(() => {
                         {widgets?.map((data, idx) => (
                             <Widget key={`widget-${idx}`} widget={data} mode={mode} env={env} />
                         ))}
-                        <div className="flex-grow" />
+                        <div className="flex-grow" data-clear-panel-focus="true" onMouseDown={clearPanelFocus} />
                         {env.isDev() || featureWaveAppBuilder ? (
                             <div
                                 ref={appsButtonRef}
@@ -628,7 +634,7 @@ const Widgets = memo(() => {
                 {widgets?.map((data, idx) => (
                     <Widget key={`measurement-widget-${idx}`} widget={data} mode="normal" env={env} />
                 ))}
-                <div className="flex-grow" />
+                <div className="flex-grow" data-clear-panel-focus="true" onMouseDown={clearPanelFocus} />
                 <div className="flex flex-col justify-center items-center w-full py-1.5 pr-0.5 text-lg">
                     <div>
                         <i className={makeIconClass("gear", true)}></i>

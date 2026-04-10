@@ -100,13 +100,22 @@ async function reinitWave() {
     console.log("Reinit Wave");
     getApi().sendLog("Reinit Wave");
 
-    // We use this hack to prevent a flicker of the previously-hovered tab when this view was last active.
+    // Suppress stale :hover state until the pointer actually moves in this renderer.
+    // This avoids ghost-hover when switching between cached tab WebContentsViews.
     document.body.classList.add("nohover");
-    requestAnimationFrame(() =>
-        setTimeout(() => {
+    requestAnimationFrame(() => {
+        let cleanedUp = false;
+        const cleanupNoHover = () => {
+            if (cleanedUp) {
+                return;
+            }
+            cleanedUp = true;
+            window.removeEventListener("pointermove", cleanupNoHover, true);
             document.body.classList.remove("nohover");
-        }, 100)
-    );
+        };
+        window.addEventListener("pointermove", cleanupNoHover, true);
+        setTimeout(cleanupNoHover, 1500);
+    });
 
     await WOS.reloadWaveObject<Client>(WOS.makeORef("client", savedInitOpts.clientId));
     const waveWindow = await WOS.reloadWaveObject<WaveWindow>(WOS.makeORef("window", savedInitOpts.windowId));
