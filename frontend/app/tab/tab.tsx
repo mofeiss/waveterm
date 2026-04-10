@@ -78,6 +78,7 @@ const TabV = forwardRef<HTMLDivElement, TabVProps>((props, ref) => {
     const editableRef = useRef<HTMLDivElement>(null);
     const editableTimeoutRef = useRef<NodeJS.Timeout>(null);
     const tabRef = useRef<HTMLDivElement>(null);
+    const selectedOnMouseDownRef = useRef(false);
 
     useImperativeHandle(ref, () => tabRef.current as HTMLDivElement);
 
@@ -178,6 +179,23 @@ const TabV = forwardRef<HTMLDivElement, TabVProps>((props, ref) => {
         event.stopPropagation();
     };
 
+    const handleMouseDown = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        selectedOnMouseDownRef.current = false;
+        if (event.button === 0 && !active) {
+            onClick();
+            selectedOnMouseDownRef.current = true;
+        }
+        onDragStart(event);
+    };
+
+    const handleClick = () => {
+        if (selectedOnMouseDownRef.current) {
+            selectedOnMouseDownRef.current = false;
+            return;
+        }
+        onClick();
+    };
+
     return (
         <div
             ref={tabRef}
@@ -186,8 +204,8 @@ const TabV = forwardRef<HTMLDivElement, TabVProps>((props, ref) => {
                 dragging: isDragging,
                 "new-tab": isNew,
             })}
-            onMouseDown={onDragStart}
-            onClick={onClick}
+            onMouseDown={handleMouseDown}
+            onClick={handleClick}
             onContextMenu={onContextMenu}
             data-tab-id={tabId}
         >

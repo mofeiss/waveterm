@@ -567,6 +567,16 @@ export class WebViewModel implements ViewModel {
             return true;
         }
         this.webviewRef.current?.focus();
+        setActiveZoomBlockId(this.blockId);
+        this.nodeModel.focusNode();
+        try {
+            const webContentsId = this.webviewRef.current?.getWebContentsId?.();
+            if (webContentsId != null) {
+                this.env.electron.setWebviewFocus(webContentsId, this.blockId);
+            }
+        } catch (e) {
+            console.warn("Failed to synchronize webview focus state", e);
+        }
         return true;
     }
 
@@ -1056,6 +1066,21 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
         if (!webview) {
             return;
         }
+        const syncWebviewPanelFocus = (focusNativeWebview: boolean) => {
+            try {
+                const webContentsId = webview.getWebContentsId?.();
+                if (webContentsId != null) {
+                    env.electron.setWebviewFocus(webContentsId, model.blockId);
+                }
+            } catch (e) {
+                console.warn("Failed to synchronize webview focus state", e);
+            }
+            setActiveZoomBlockId(model.blockId);
+            model.nodeModel.focusNode();
+            if (focusNativeWebview && document.activeElement !== webview) {
+                webview.focus();
+            }
+        };
         const navigateListener = (e: any) => {
             setErrorText("");
             if (e.isMainFrame) {
@@ -1090,13 +1115,24 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
                 }
             }
         };
-        const webviewFocus = () => {
-            env.electron.setWebviewFocus(webview.getWebContentsId(), model.blockId);
-            setActiveZoomBlockId(model.blockId);
-            model.nodeModel.focusNode();
-        };
+        const webviewFocus = () => syncWebviewPanelFocus(false);
         const webviewBlur = () => {
             env.electron.setWebviewFocus(null, null);
+            clearActiveZoomBlockId(model.blockId);
+        };
+        const webviewPointerDown = () => syncWebviewPanelFocus(true);
+        const webviewIpcMessage = (event: any) => {
+            if (event.channel !== "wave-webview-interaction") {
+                return;
+            }
+            const interactionType = event.args?.[0]?.type;
+            if (interactionType === "pointerdown") {
+                syncWebviewPanelFocus(true);
+                return;
+            }
+            if (interactionType === "focusin") {
+                syncWebviewPanelFocus(false);
+            }
         };
         const handleDomReady = () => {
             globalStore.set(model.domReady, true);
@@ -1116,8 +1152,10 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
         webview.addEventListener("did-stop-loading", stopLoadingHandler);
         webview.addEventListener("new-window", newWindowHandler);
         webview.addEventListener("did-fail-load", failLoadHandler);
+        webview.addEventListener("pointerdown", webviewPointerDown);
         webview.addEventListener("focus", webviewFocus);
         webview.addEventListener("blur", webviewBlur);
+        webview.addEventListener("ipc-message", webviewIpcMessage);
         webview.addEventListener("dom-ready", handleDomReady);
         webview.addEventListener("media-started-playing", handleMediaPlaying);
         webview.addEventListener("media-paused", handleMediaPaused);
@@ -1133,8 +1171,10 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
             webview.removeEventListener("did-fail-load", failLoadHandler);
             webview.removeEventListener("did-start-loading", startLoadingHandler);
             webview.removeEventListener("did-stop-loading", stopLoadingHandler);
+            webview.removeEventListener("pointerdown", webviewPointerDown);
             webview.removeEventListener("focus", webviewFocus);
             webview.removeEventListener("blur", webviewBlur);
+            webview.removeEventListener("ipc-message", webviewIpcMessage);
             webview.removeEventListener("dom-ready", handleDomReady);
             webview.removeEventListener("media-started-playing", handleMediaPlaying);
             webview.removeEventListener("media-paused", handleMediaPaused);

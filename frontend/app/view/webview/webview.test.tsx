@@ -4,7 +4,7 @@
 import { globalStore } from "@/app/store/jotaiStore";
 import { makeMockWaveEnv } from "@/preview/mock/mockwaveenv";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { atom } from "jotai";
 import { getWebPreviewDisplayUrl, WebViewModel, WebViewPreviewFallback } from "./webview";
 
@@ -99,5 +99,36 @@ describe("webview preview fallback", () => {
         expect(globalStore.get(model.homepageUrl)).toBe("https://global.example");
         expect(globalStore.get(env.getSettingsKeyAtom("web:defaulturl"))).toBe("https://global.example");
         expect(globalStore.get(env.wos.getWaveObjectAtom<Block>(`block:${blockId}`))?.meta?.pinnedurl).toBeUndefined();
+    });
+
+    it("synchronizes block focus with native webview focus when giveFocus succeeds", () => {
+        const blockId = "webview-focus-sync";
+        const setWebviewFocus = vi.fn();
+        const focusNode = vi.fn();
+        const env = makeMockWaveEnv({
+            electron: {
+                setWebviewFocus,
+            } as Partial<ElectronApi>,
+        });
+        const model = new WebViewModel({
+            blockId,
+            nodeModel: {
+                isFocused: atom(false),
+                focusNode,
+            } as any,
+            tabModel: {} as any,
+            waveEnv: env,
+        });
+        const focusNativeWebview = vi.fn();
+        (model.webviewRef as any).current = {
+            focus: focusNativeWebview,
+            getWebContentsId: () => 42,
+        };
+        model.autoFocusUrlInputPending = false;
+
+        expect(model.giveFocus()).toBe(true);
+        expect(focusNativeWebview).toHaveBeenCalledOnce();
+        expect(focusNode).toHaveBeenCalledOnce();
+        expect(setWebviewFocus).toHaveBeenCalledWith(42, blockId);
     });
 });

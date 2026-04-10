@@ -36,4 +36,26 @@ document.addEventListener("mouseup", (event) => {
     }
 });
 
+document.addEventListener(
+    "pointerdown",
+    (event) => {
+        if (!event.isTrusted) {
+            return;
+        }
+        ipcRenderer.sendToHost("wave-webview-interaction", { type: "pointerdown" });
+    },
+    true
+);
+
+document.addEventListener(
+    "focusin",
+    (event) => {
+        if (!event.isTrusted) {
+            return;
+        }
+        ipcRenderer.sendToHost("wave-webview-interaction", { type: "focusin" });
+    },
+    true
+);
+
 console.log("loaded wave preload-webview.ts");
