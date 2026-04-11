@@ -686,6 +686,9 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
             throw new Error(`cannot promote subtab for non-tab parent: ${rootBlock.parentoref}`);
         }
         const parentTab = (await ObjectService.GetObject(WOS.makeORef("tab", parentId))) as Tab;
+        // This path immediately reuses an existing child block as the new root block. We need the
+        // updated objects back in the local cache right away, otherwise the promoted block can keep
+        // rendering its stale pre-promotion metadata (including missing blocktabs state).
 
         await Promise.all(
             remainingChildIds.map(async (childId) => {
@@ -695,7 +698,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
                         ...childBlock,
                         parentoref: WOS.makeORef("block", promoteId),
                     } as Block,
-                    false
+                    true
                 );
             })
         );
@@ -712,14 +715,14 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
                     [BLOCK_TABS_ACTIVE_METAKEY]: nextActiveTabId,
                 },
             } as Block,
-            false
+            true
         );
         await ObjectService.UpdateObject(
             {
                 ...parentTab,
                 blockids: (parentTab.blockids ?? []).map((id) => (id === blockId ? promoteId : id)),
             } as Tab,
-            false
+            true
         );
         await ObjectService.UpdateObject(
             {
@@ -731,7 +734,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
                     [BLOCK_TABS_ACTIVE_METAKEY]: null,
                 },
             } as Block,
-            false
+            true
         );
 
         const layoutModel = getLayoutModelForStaticTab();
@@ -769,7 +772,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
                                 ...childBlock,
                                 parentoref: WOS.makeORef("block", nextRootBlockId),
                             } as Block,
-                            false
+                            true
                         );
                     })
             );
@@ -786,7 +789,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
                         [BLOCK_TABS_ACTIVE_METAKEY]: null,
                     },
                 } as Block,
-                false
+                true
             );
             await ObjectService.UpdateObject(
                 {
@@ -800,14 +803,14 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
                         [BLOCK_TABS_ACTIVE_METAKEY]: nextPersistedActiveTabId,
                     },
                 } as Block,
-                false
+                true
             );
             await ObjectService.UpdateObject(
                 {
                     ...parentTab,
                     blockids: (parentTab.blockids ?? []).map((id) => (id === blockId ? nextRootBlockId : id)),
                 } as Tab,
-                false
+                true
             );
 
             const layoutModel = getLayoutModelForStaticTab();
