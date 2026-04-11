@@ -22,7 +22,7 @@ const config = {
         {
             from: "./dist",
             to: "./dist",
-            filter: ["**/*", "!tsunamiscaffold/**/*"],
+            filter: ["**/*", "!tsunamiscaffold/**/*", "!bin/wavesrv*"],
         },
         {
             from: ".",
@@ -32,6 +32,11 @@ const config = {
         "!node_modules", // We don't need electron-builder to package in Node modules as Vite has already bundled any code that our program is using.
     ],
     extraResources: [
+        {
+            from: "dist/bin",
+            to: "app.asar.unpacked/dist/bin",
+            filter: ["wavesrv*"],
+        },
         {
             from: "dist/tsunamiscaffold",
             to: "tsunamiscaffold",
@@ -122,20 +127,21 @@ const config = {
         url: "https://dl.waveterm.dev/releases-w2",
     },
     afterPack: (context) => {
-        // This is a workaround to restore file permissions to the wavesrv binaries on macOS after packaging the universal binary.
-        if (context.electronPlatformName === "darwin" && context.arch === Arch.universal) {
+        // Ensure the packaged wavesrv binaries remain executable after macOS packaging.
+        if (context.electronPlatformName === "darwin") {
             const packageBinDir = path.resolve(
                 context.appOutDir,
                 `${pkg.productName}.app/Contents/Resources/app.asar.unpacked/dist/bin`
             );
 
-            // Reapply file permissions to the wavesrv binaries in the final app package
-            fs.readdirSync(packageBinDir, {
-                recursive: true,
-                withFileTypes: true,
-            })
-                .filter((f) => f.isFile() && f.name.startsWith("wavesrv"))
-                .forEach((f) => fs.chmodSync(path.resolve(f.parentPath ?? f.path, f.name), 0o755)); // 0o755 corresponds to -rwxr-xr-x
+            if (fs.existsSync(packageBinDir)) {
+                fs.readdirSync(packageBinDir, {
+                    recursive: true,
+                    withFileTypes: true,
+                })
+                    .filter((f) => f.isFile() && f.name.startsWith("wavesrv"))
+                    .forEach((f) => fs.chmodSync(path.resolve(f.parentPath ?? f.path, f.name), 0o755)); // 0o755 corresponds to -rwxr-xr-x
+            }
         }
     },
 };
