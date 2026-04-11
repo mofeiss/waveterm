@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { getMountedBlockTabIds, moveBlockTabId, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
+import {
+    deriveBlockTabReorderState,
+    getMountedBlockTabIds,
+    moveBlockTabId,
+    resolveBlockTabViewModel,
+    ROOT_TAB_ID,
+} from "./block-tabs-util";
 
 describe("getMountedBlockTabIds", () => {
     it("always keeps the root tab mounted", () => {
@@ -75,5 +81,35 @@ describe("moveBlockTabId", () => {
     it("ignores unknown tab ids", () => {
         const tabIds = ["a", "b", "c"];
         expect(moveBlockTabId(tabIds, "missing", 1)).toEqual(tabIds);
+    });
+});
+
+describe("deriveBlockTabReorderState", () => {
+    it("keeps child-only reorders on the same root block", () => {
+        expect(deriveBlockTabReorderState("root", ["a", "b", "c"], ROOT_TAB_ID, ["root", "b", "a", "c"])).toEqual({
+            nextRootBlockId: "root",
+            nextChildTabIds: ["b", "a", "c"],
+            nextPersistedActiveTabId: null,
+        });
+    });
+
+    it("promotes the new first tab when the root tab is dragged away from index 0", () => {
+        expect(deriveBlockTabReorderState("root", ["a", "b", "c"], ROOT_TAB_ID, ["a", "root", "b", "c"])).toEqual({
+            nextRootBlockId: "a",
+            nextChildTabIds: ["root", "b", "c"],
+            nextPersistedActiveTabId: "root",
+        });
+    });
+
+    it("maps the active child to the root slot when that child becomes first", () => {
+        expect(deriveBlockTabReorderState("root", ["a", "b", "c"], "b", ["b", "root", "a", "c"])).toEqual({
+            nextRootBlockId: "b",
+            nextChildTabIds: ["root", "a", "c"],
+            nextPersistedActiveTabId: null,
+        });
+    });
+
+    it("rejects incomplete reorder payloads", () => {
+        expect(deriveBlockTabReorderState("root", ["a", "b"], ROOT_TAB_ID, ["root", "a"])).toBeNull();
     });
 });

@@ -16,7 +16,7 @@ import * as jotai from "jotai";
 import * as React from "react";
 import { BlockTabTrace, endBlockTabTrace, logBlockTabTrace, startBlockTabTrace } from "../debug/block-tab-trace";
 import { BlockEnv } from "./blockenv";
-import { getMountedBlockTabIds, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
+import { deriveBlockTabReorderState, getMountedBlockTabIds, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
 import { BlockNodeModel } from "./blocktypes";
 const BLOCK_TABS_IDS_METAKEY = "blocktabs:ids";
 const BLOCK_TABS_ACTIVE_METAKEY = "blocktabs:activeid";
@@ -345,19 +345,19 @@ const BlockHeaderTab = React.memo(
 BlockHeaderTab.displayName = "BlockHeaderTab";
 
 type BlockHeaderTabsProps = {
-    parentBlockId: string;
+    rootBlockId: string;
     childTabIds: string[];
     activeTabId: string;
     onSelectTab: (tabId: string, trace?: BlockTabTrace) => void;
     onActiveTabPress: (tabId: string, trace?: BlockTabTrace) => void;
     onCloseTab: (tabId: string) => void;
     onRenameTab: (tabId: string, newName: string) => void;
-    onReorderTabs: (nextChildTabIds: string[]) => Promise<void> | void;
+    onReorderTabs: (nextOrderedBlockIds: string[]) => Promise<void> | void;
 };
 
 const BlockHeaderTabs = React.memo(
     ({
-        parentBlockId,
+        rootBlockId,
         childTabIds,
         activeTabId,
         onSelectTab,
@@ -366,10 +366,10 @@ const BlockHeaderTabs = React.memo(
         onRenameTab,
         onReorderTabs,
     }: BlockHeaderTabsProps) => {
-        const [previewChildTabIds, setPreviewChildTabIds] = React.useState<string[] | null>(null);
-        const childTabRefs = React.useRef(new Map<string, React.RefObject<HTMLDivElement>>());
+        const [previewOrderedTabIds, setPreviewOrderedTabIds] = React.useState<string[] | null>(null);
+        const tabRefs = React.useRef(new Map<string, React.RefObject<HTMLDivElement>>());
         const onReorderTabsRef = React.useRef(onReorderTabs);
-        const displayedChildTabIds = previewChildTabIds ?? childTabIds;
+        const displayedOrderedTabIds = previewOrderedTabIds ?? [rootBlockId, ...childTabIds];
         const dragStateRef = React.useRef<{
             draggedTabId: string | null;
             startX: number;
@@ -387,8 +387,8 @@ const BlockHeaderTabs = React.memo(
             dragged: false,
             wasActive: false,
             trace: null,
-            currentOrder: childTabIds,
-            initialOrder: childTabIds,
+            currentOrder: [rootBlockId, ...childTabIds],
+            initialOrder: [rootBlockId, ...childTabIds],
             initialCenters: {},
         });
 
@@ -396,14 +396,16 @@ const BlockHeaderTabs = React.memo(
             onReorderTabsRef.current = onReorderTabs;
         }, [onReorderTabs]);
 
-        const getChildTabRef = React.useCallback((childId: string) => {
-            let ref = childTabRefs.current.get(childId);
+        const getTabRef = React.useCallback((tabId: string) => {
+            let ref = tabRefs.current.get(tabId);
             if (ref == null) {
                 ref = React.createRef<HTMLDivElement>();
-                childTabRefs.current.set(childId, ref);
+                tabRefs.current.set(tabId, ref);
             }
             return ref;
         }, []);
+
+        const mapToLogicalTabId = React.useCallback((tabId: string) => (tabId === rootBlockId ? ROOT_TAB_ID : tabId), [rootBlockId]);
 
         const handleDocumentMouseMove = React.useCallback(
             (event: MouseEvent) => {
@@ -444,7 +446,7 @@ const BlockHeaderTabs = React.memo(
                     return;
                 }
                 dragState.currentOrder = nextOrder;
-                setPreviewChildTabIds(nextOrder);
+                setPreviewOrderedTabIds(nextOrder);
                 logBlockTabTrace(dragState.trace, "block-subtab drag reorder preview", {
                     draggedTabId: dragState.draggedTabId,
                     targetIndex,
@@ -463,7 +465,8 @@ const BlockHeaderTabs = React.memo(
                     return;
                 }
                 const nextOrder = dragState.currentOrder;
-                const didReorder = dragState.dragged && !blockTabIdsEqual(nextOrder, childTabIds);
+                const currentOrderedTabIds = [rootBlockId, ...childTabIds];
+                const didReorder = dragState.dragged && !blockTabIdsEqual(nextOrder, currentOrderedTabIds);
                 logBlockTabTrace(dragState.trace, "block-subtab drag ended", {
                     draggedTabId: dragState.draggedTabId,
                     didReorder,
@@ -475,70 +478,71 @@ const BlockHeaderTabs = React.memo(
                 dragState.draggedTabId = null;
                 dragState.startX = 0;
                 dragState.startY = 0;
-                dragState.currentOrder = childTabIds;
-                dragState.initialOrder = childTabIds;
+                dragState.currentOrder = currentOrderedTabIds;
+                dragState.initialOrder = currentOrderedTabIds;
                 dragState.initialCenters = {};
                 dragState.wasActive = false;
-                setPreviewChildTabIds(null);
+                setPreviewOrderedTabIds(null);
                 if (didReorder) {
                     void onReorderTabsRef.current(nextOrder);
                 } else {
                     if (pressedTabId != null) {
+                        const logicalTabId = mapToLogicalTabId(pressedTabId);
                         if (wasActive) {
                             logBlockTabTrace(trace, "block-subtab mouseup on active tab", {
                                 draggedTabId: pressedTabId,
                             });
-                            onActiveTabPress(pressedTabId, trace ?? undefined);
+                            onActiveTabPress(logicalTabId, trace ?? undefined);
                         } else {
                             logBlockTabTrace(trace, "block-subtab mouseup selecting tab", {
                                 draggedTabId: pressedTabId,
                             });
-                            onSelectTab(pressedTabId, trace ?? undefined);
+                            onSelectTab(logicalTabId, trace ?? undefined);
                         }
                     }
                 }
                 dragState.dragged = false;
                 dragState.trace = null;
             },
-            [childTabIds, handleDocumentMouseMove, onActiveTabPress, onSelectTab]
+            [childTabIds, handleDocumentMouseMove, mapToLogicalTabId, onActiveTabPress, onSelectTab, rootBlockId]
         );
 
-        const handleChildPressStart = React.useCallback(
-            (childId: string, event: React.MouseEvent<HTMLDivElement>, trace: BlockTabTrace) => {
+        const handleTabPressStart = React.useCallback(
+            (tabId: string, isActiveTab: boolean, event: React.MouseEvent<HTMLDivElement>, trace: BlockTabTrace) => {
                 if (event.button !== 0) {
                     return;
                 }
                 document.removeEventListener("mousemove", handleDocumentMouseMove);
                 document.removeEventListener("mouseup", handleDocumentMouseUp);
-                const initialOrder = displayedChildTabIds;
+                const initialOrder = displayedOrderedTabIds;
                 const initialCenters = initialOrder.reduce<Record<string, number>>((acc, tabId) => {
-                    const rect = childTabRefs.current.get(tabId)?.current?.getBoundingClientRect();
+                    const rect = tabRefs.current.get(tabId)?.current?.getBoundingClientRect();
                     if (rect != null) {
                         acc[tabId] = rect.left + rect.width / 2;
                     }
                     return acc;
                 }, {});
                 dragStateRef.current = {
-                    draggedTabId: childId,
+                    draggedTabId: tabId,
                     startX: event.clientX,
                     startY: event.clientY,
                     dragged: false,
-                    wasActive: activeTabId === childId,
+                    wasActive: isActiveTab,
                     trace,
                     currentOrder: initialOrder,
                     initialOrder,
                     initialCenters,
                 };
                 logBlockTabTrace(trace, "block-subtab drag armed", {
-                    draggedTabId: childId,
-                    wasActive: activeTabId === childId,
-                    orderedChildTabIds: initialOrder,
+                    draggedTabId: tabId,
+                    wasActive: isActiveTab,
+                    orderedTabIds: initialOrder,
                     initialCenters,
                 });
                 document.addEventListener("mousemove", handleDocumentMouseMove);
                 document.addEventListener("mouseup", handleDocumentMouseUp);
             },
-            [activeTabId, displayedChildTabIds, handleDocumentMouseMove, handleDocumentMouseUp]
+            [displayedOrderedTabIds, handleDocumentMouseMove, handleDocumentMouseUp]
         );
 
         React.useEffect(() => {
@@ -550,28 +554,21 @@ const BlockHeaderTabs = React.memo(
 
         return (
             <div className="block-frame-tabs">
-                <BlockHeaderTab
-                    targetBlockId={parentBlockId}
-                    active={activeTabId === ROOT_TAB_ID}
-                    canClose={childTabIds.length > 0}
-                    onSelect={(trace) => onSelectTab(ROOT_TAB_ID, trace)}
-                    onActivePress={(trace) => onActiveTabPress(ROOT_TAB_ID, trace)}
-                    onClose={() => onCloseTab(ROOT_TAB_ID)}
-                    onRename={(newName) => onRenameTab(ROOT_TAB_ID, newName)}
-                />
-                {displayedChildTabIds.map((childId) => (
+                {displayedOrderedTabIds.map((tabId) => (
                     <BlockHeaderTab
-                        key={childId}
-                        targetBlockId={childId}
-                        active={activeTabId === childId}
-                        canClose={true}
-                        dragging={dragStateRef.current.draggedTabId === childId && dragStateRef.current.dragged}
-                        onSelect={(trace) => onSelectTab(childId, trace)}
-                        onActivePress={(trace) => onActiveTabPress(childId, trace)}
-                        onClose={() => onCloseTab(childId)}
-                        onRename={(newName) => onRenameTab(childId, newName)}
-                        onPressStart={(event, trace) => handleChildPressStart(childId, event, trace)}
-                        tabRef={getChildTabRef(childId)}
+                        key={tabId}
+                        targetBlockId={tabId}
+                        active={activeTabId === mapToLogicalTabId(tabId)}
+                        canClose={displayedOrderedTabIds.length > 1}
+                        dragging={dragStateRef.current.draggedTabId === tabId && dragStateRef.current.dragged}
+                        onSelect={(trace) => onSelectTab(mapToLogicalTabId(tabId), trace)}
+                        onActivePress={(trace) => onActiveTabPress(mapToLogicalTabId(tabId), trace)}
+                        onClose={() => onCloseTab(mapToLogicalTabId(tabId))}
+                        onRename={(newName) => onRenameTab(mapToLogicalTabId(tabId), newName)}
+                        onPressStart={(event, trace) =>
+                            handleTabPressStart(tabId, activeTabId === mapToLogicalTabId(tabId), event, trace)
+                        }
+                        tabRef={getTabRef(tabId)}
                     />
                 ))}
             </div>
@@ -752,6 +749,83 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
         setTimeout(() => refocusNode(promoteId), 10);
     }, [blockId]);
 
+    const reorderTabsWithNewRoot = React.useCallback(
+        async (nextRootBlockId: string, nextChildIds: string[], nextPersistedActiveTabId: string | null) => {
+            const rootBlock = (await ObjectService.GetObject(WOS.makeORef("block", blockId))) as Block;
+            const nextRootBlock = (await ObjectService.GetObject(WOS.makeORef("block", nextRootBlockId))) as Block;
+            const [parentType, parentId] = WOS.splitORef(rootBlock.parentoref);
+            if (parentType !== "tab") {
+                throw new Error(`cannot reorder subtab root for non-tab parent: ${rootBlock.parentoref}`);
+            }
+            const parentTab = (await ObjectService.GetObject(WOS.makeORef("tab", parentId))) as Tab;
+
+            await Promise.all(
+                nextChildIds
+                    .filter((childId) => childId !== blockId)
+                    .map(async (childId) => {
+                        const childBlock = (await ObjectService.GetObject(WOS.makeORef("block", childId))) as Block;
+                        await ObjectService.UpdateObject(
+                            {
+                                ...childBlock,
+                                parentoref: WOS.makeORef("block", nextRootBlockId),
+                            } as Block,
+                            false
+                        );
+                    })
+            );
+
+            await ObjectService.UpdateObject(
+                {
+                    ...rootBlock,
+                    parentoref: WOS.makeORef("block", nextRootBlockId),
+                    subblockids: [],
+                    meta: {
+                        ...(rootBlock.meta ?? {}),
+                        "frame:closelocked": null,
+                        [BLOCK_TABS_IDS_METAKEY]: null,
+                        [BLOCK_TABS_ACTIVE_METAKEY]: null,
+                    },
+                } as Block,
+                false
+            );
+            await ObjectService.UpdateObject(
+                {
+                    ...nextRootBlock,
+                    parentoref: rootBlock.parentoref,
+                    subblockids: nextChildIds,
+                    meta: {
+                        ...(nextRootBlock.meta ?? {}),
+                        "frame:closelocked": rootBlock.meta?.["frame:closelocked"] ?? null,
+                        [BLOCK_TABS_IDS_METAKEY]: nextChildIds.length > 0 ? nextChildIds : null,
+                        [BLOCK_TABS_ACTIVE_METAKEY]: nextPersistedActiveTabId,
+                    },
+                } as Block,
+                false
+            );
+            await ObjectService.UpdateObject(
+                {
+                    ...parentTab,
+                    blockids: (parentTab.blockids ?? []).map((id) => (id === blockId ? nextRootBlockId : id)),
+                } as Tab,
+                false
+            );
+
+            const layoutModel = getLayoutModelForStaticTab();
+            const targetNode = layoutModel.getNodeByBlockId(blockId);
+            if (targetNode != null) {
+                const replaceAction: LayoutTreeReplaceNodeAction = {
+                    type: LayoutTreeActionType.ReplaceNode,
+                    targetNodeId: targetNode.id,
+                    newNode: newLayoutNode(undefined, undefined, undefined, { blockId: nextRootBlockId }),
+                    focused: true,
+                };
+                layoutModel.treeReducer(replaceAction);
+            }
+            setTimeout(() => refocusNode(nextRootBlockId), 10);
+        },
+        [blockId]
+    );
+
     const selectTab = React.useCallback(
         (nextTabId: string, trace?: BlockTabTrace) => {
             const nextActive = nextTabId === ROOT_TAB_ID ? ROOT_TAB_ID : nextTabId;
@@ -827,19 +901,29 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
     );
 
     const reorderTabs = React.useCallback(
-        async (nextChildIds: string[]) => {
-            const normalizedNextChildIds = nextChildIds.filter((id) => childTabIdsRef.current.includes(id));
-            if (
-                normalizedNextChildIds.length !== childTabIdsRef.current.length ||
-                normalizedNextChildIds.every((id, index) => id === childTabIdsRef.current[index])
-            ) {
+        async (nextOrderedBlockIds: string[]) => {
+            const reorderState = deriveBlockTabReorderState(
+                blockId,
+                childTabIdsRef.current,
+                activeTabIdRef.current,
+                nextOrderedBlockIds
+            );
+            if (reorderState == null) {
                 return;
             }
-            setOptimisticChildTabIds(normalizedNextChildIds);
-            childTabIdsRef.current = normalizedNextChildIds;
-            await persistTabs(normalizedNextChildIds, activeTabIdRef.current);
+            if (reorderState.nextRootBlockId === blockId) {
+                setOptimisticChildTabIds(reorderState.nextChildTabIds);
+                childTabIdsRef.current = reorderState.nextChildTabIds;
+                await persistTabs(reorderState.nextChildTabIds, activeTabIdRef.current);
+                return;
+            }
+            await reorderTabsWithNewRoot(
+                reorderState.nextRootBlockId,
+                reorderState.nextChildTabIds,
+                reorderState.nextPersistedActiveTabId
+            );
         },
-        [persistTabs]
+        [blockId, persistTabs, reorderTabsWithNewRoot]
     );
 
     const closeTab = React.useCallback(
@@ -955,7 +1039,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
 
     const headerTabs = hasTabs ? (
         <BlockHeaderTabs
-            parentBlockId={blockId}
+            rootBlockId={blockId}
             childTabIds={effectiveChildTabIds}
             activeTabId={activeTabId}
             onSelectTab={selectTab}
@@ -966,8 +1050,8 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
             onRenameTab={(tabId, newName) => {
                 void renameTab(tabId, newName);
             }}
-            onReorderTabs={(nextChildIds) => {
-                void reorderTabs(nextChildIds);
+            onReorderTabs={(nextOrderedBlockIds) => {
+                void reorderTabs(nextOrderedBlockIds);
             }}
         />
     ) : null;

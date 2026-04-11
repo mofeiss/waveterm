@@ -45,4 +45,41 @@ function moveBlockTabId(tabIds: string[], draggedTabId: string, targetIndex: num
     return nextTabIds;
 }
 
-export { ROOT_TAB_ID, getMountedBlockTabIds, moveBlockTabId, resolveBlockTabViewModel };
+type BlockTabReorderState = {
+    nextRootBlockId: string;
+    nextChildTabIds: string[];
+    nextPersistedActiveTabId: string | null;
+};
+
+function deriveBlockTabReorderState(
+    rootBlockId: string,
+    childTabIds: string[],
+    activeTabId: string,
+    nextOrderedBlockIds: string[]
+): BlockTabReorderState | null {
+    const currentOrderedBlockIds = [rootBlockId, ...childTabIds];
+    if (nextOrderedBlockIds.length !== currentOrderedBlockIds.length) {
+        return null;
+    }
+    const validTabIds = new Set(currentOrderedBlockIds);
+    const normalizedOrderedBlockIds: string[] = [];
+    for (const blockId of nextOrderedBlockIds) {
+        if (!validTabIds.has(blockId) || normalizedOrderedBlockIds.includes(blockId)) {
+            return null;
+        }
+        normalizedOrderedBlockIds.push(blockId);
+    }
+    const isSameOrder = normalizedOrderedBlockIds.every((blockId, index) => blockId === currentOrderedBlockIds[index]);
+    if (isSameOrder) {
+        return null;
+    }
+    const actualActiveBlockId = activeTabId === ROOT_TAB_ID ? rootBlockId : activeTabId;
+    const nextRootBlockId = normalizedOrderedBlockIds[0];
+    return {
+        nextRootBlockId,
+        nextChildTabIds: normalizedOrderedBlockIds.slice(1),
+        nextPersistedActiveTabId: actualActiveBlockId === nextRootBlockId ? null : actualActiveBlockId,
+    };
+}
+
+export { ROOT_TAB_ID, deriveBlockTabReorderState, getMountedBlockTabIds, moveBlockTabId, resolveBlockTabViewModel };
