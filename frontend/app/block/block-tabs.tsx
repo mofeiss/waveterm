@@ -16,7 +16,13 @@ import * as jotai from "jotai";
 import * as React from "react";
 import { BlockTabTrace, endBlockTabTrace, logBlockTabTrace, startBlockTabTrace } from "../debug/block-tab-trace";
 import { BlockEnv } from "./blockenv";
-import { deriveBlockTabReorderState, getMountedBlockTabIds, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
+import {
+    deriveBlockTabReorderState,
+    deriveBlockTabRootCloseState,
+    getMountedBlockTabIds,
+    resolveBlockTabViewModel,
+    ROOT_TAB_ID,
+} from "./block-tabs-util";
 import { BlockNodeModel } from "./blocktypes";
 const BLOCK_TABS_IDS_METAKEY = "blocktabs:ids";
 const BLOCK_TABS_ACTIVE_METAKEY = "blocktabs:activeid";
@@ -667,14 +673,12 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
 
     const promoteChildTabToRoot = React.useCallback(async () => {
         const currentChildIds = [...childTabIdsRef.current];
-        if (currentChildIds.length === 0) {
+        const nextRootState = deriveBlockTabRootCloseState(currentChildIds, activeTabIdRef.current);
+        if (nextRootState == null) {
             return;
         }
-        const promoteId =
-            activeTabIdRef.current !== ROOT_TAB_ID && currentChildIds.includes(activeTabIdRef.current)
-                ? activeTabIdRef.current
-                : currentChildIds[0];
-        const remainingChildIds = currentChildIds.filter((id) => id !== promoteId);
+        const { nextRootBlockId: promoteId, nextChildTabIds: remainingChildIds, nextPersistedActiveTabId: nextActiveTabId } =
+            nextRootState;
         const rootBlock = (await ObjectService.GetObject(WOS.makeORef("block", blockId))) as Block;
         const promotedBlock = (await ObjectService.GetObject(WOS.makeORef("block", promoteId))) as Block;
         const [parentType, parentId] = WOS.splitORef(rootBlock.parentoref);
@@ -696,10 +700,6 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
             })
         );
 
-        const nextActiveTabId =
-            activeTabIdRef.current !== ROOT_TAB_ID && activeTabIdRef.current !== promoteId
-                ? activeTabIdRef.current
-                : null;
         await ObjectService.UpdateObject(
             {
                 ...promotedBlock,

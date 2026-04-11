@@ -51,6 +51,27 @@ type BlockTabReorderState = {
     nextPersistedActiveTabId: string | null;
 };
 
+type BlockTabRootCloseState = {
+    nextRootBlockId: string;
+    nextChildTabIds: string[];
+    nextPersistedActiveTabId: string | null;
+};
+
+function deriveBlockTabRootCloseState(childTabIds: string[], activeTabId: string): BlockTabRootCloseState | null {
+    if (childTabIds.length === 0) {
+        return null;
+    }
+    const [nextRootBlockId, ...nextChildTabIds] = childTabIds;
+    return {
+        nextRootBlockId,
+        nextChildTabIds,
+        nextPersistedActiveTabId:
+            activeTabId !== ROOT_TAB_ID && activeTabId !== nextRootBlockId && nextChildTabIds.includes(activeTabId)
+                ? activeTabId
+                : null,
+    };
+}
+
 function deriveBlockTabReorderState(
     rootBlockId: string,
     childTabIds: string[],
@@ -82,4 +103,11 @@ function deriveBlockTabReorderState(
     };
 }
 
-export { ROOT_TAB_ID, deriveBlockTabReorderState, getMountedBlockTabIds, moveBlockTabId, resolveBlockTabViewModel };
+export {
+    ROOT_TAB_ID,
+    deriveBlockTabReorderState,
+    deriveBlockTabRootCloseState,
+    getMountedBlockTabIds,
+    moveBlockTabId,
+    resolveBlockTabViewModel,
+};

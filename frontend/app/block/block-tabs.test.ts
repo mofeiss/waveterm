@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
     deriveBlockTabReorderState,
+    deriveBlockTabRootCloseState,
     getMountedBlockTabIds,
     moveBlockTabId,
     resolveBlockTabViewModel,
@@ -111,5 +112,31 @@ describe("deriveBlockTabReorderState", () => {
 
     it("rejects incomplete reorder payloads", () => {
         expect(deriveBlockTabReorderState("root", ["a", "b"], ROOT_TAB_ID, ["root", "a"])).toBeNull();
+    });
+});
+
+describe("deriveBlockTabRootCloseState", () => {
+    it("promotes the first remaining tab when closing the root while it is active", () => {
+        expect(deriveBlockTabRootCloseState(["a", "b", "c"], ROOT_TAB_ID)).toEqual({
+            nextRootBlockId: "a",
+            nextChildTabIds: ["b", "c"],
+            nextPersistedActiveTabId: null,
+        });
+    });
+
+    it("keeps the focused tab active without reordering when closing the root from its left", () => {
+        expect(deriveBlockTabRootCloseState(["a", "b", "c"], "c")).toEqual({
+            nextRootBlockId: "a",
+            nextChildTabIds: ["b", "c"],
+            nextPersistedActiveTabId: "c",
+        });
+    });
+
+    it("maps the active tab to the root slot when the first remaining tab was already focused", () => {
+        expect(deriveBlockTabRootCloseState(["a", "b", "c"], "a")).toEqual({
+            nextRootBlockId: "a",
+            nextChildTabIds: ["b", "c"],
+            nextPersistedActiveTabId: null,
+        });
     });
 });
