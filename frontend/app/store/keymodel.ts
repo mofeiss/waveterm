@@ -4,6 +4,7 @@
 import { WaveAIModel } from "@/app/aipanel/waveai-model";
 import { confirmCloseForMultiTabBlock } from "@/app/block/block-close-confirm";
 import { guardCloseForLockedBlock } from "@/app/block/block-close-guard";
+import { logBlockTabExtra } from "@/app/debug/block-tab-trace";
 import { FocusManager } from "@/app/store/focusManager";
 import {
     atoms,
@@ -71,6 +72,11 @@ export function keyboardMouseDownHandler(e: MouseEvent) {
 }
 
 function clearPanelFocus() {
+    logBlockTabExtra("clearPanelFocus", {
+        activeElementTag: document.activeElement?.tagName ?? null,
+        activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id || null : null,
+        focusedBlockId: focusedBlockId(),
+    });
     FocusManager.getInstance().setAppFocus();
     clearActiveZoomBlockId();
     getApi().setWebviewFocus(null, null);

@@ -549,10 +549,13 @@ async function openLink(uri: string, forceOpenInternally = false) {
 
 function registerBlockComponentModel(blockId: string, bcm: BlockComponentModel) {
     blockComponentModelMap.set(blockId, bcm);
+    globalStore.set(atoms.blockComponentModelVersion, (v) => v + 1);
 }
 
 function unregisterBlockComponentModel(blockId: string) {
-    blockComponentModelMap.delete(blockId);
+    if (blockComponentModelMap.delete(blockId)) {
+        globalStore.set(atoms.blockComponentModelVersion, (v) => v + 1);
+    }
 }
 
 function getBlockComponentModel(blockId: string): BlockComponentModel {

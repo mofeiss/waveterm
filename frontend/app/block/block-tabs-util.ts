@@ -15,4 +15,19 @@ function getMountedBlockTabIds(prevMountedIds: string[], activeTabId: string, ch
     return nextMountedIds;
 }
 
-export { ROOT_TAB_ID, getMountedBlockTabIds };
+function resolveBlockTabViewModel<T>(
+    activeTabId: string,
+    rootViewModel: T,
+    getChildViewModel: (tabId: string) => T | null | undefined
+): { viewModel: T; isPending: boolean } {
+    if (activeTabId === ROOT_TAB_ID) {
+        return { viewModel: rootViewModel, isPending: false };
+    }
+    const childViewModel = getChildViewModel(activeTabId);
+    if (childViewModel == null) {
+        return { viewModel: rootViewModel, isPending: true };
+    }
+    return { viewModel: childViewModel, isPending: false };
+}
+
+export { ROOT_TAB_ID, getMountedBlockTabIds, resolveBlockTabViewModel };

@@ -27,6 +27,7 @@ declare global {
         updaterStatusAtom: jotai.PrimitiveAtom<UpdaterStatus>;
         modalOpen: jotai.PrimitiveAtom<boolean>;
         allConnStatus: jotai.Atom<ConnStatus[]>;
+        blockComponentModelVersion: jotai.PrimitiveAtom<number>;
         reinitVersion: jotai.PrimitiveAtom<number>;
         waveAIRateLimitInfoAtom: jotai.PrimitiveAtom<RateLimitInfo>;
     };

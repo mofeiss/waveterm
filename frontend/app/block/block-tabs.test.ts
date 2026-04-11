@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { getMountedBlockTabIds, ROOT_TAB_ID } from "./block-tabs-util";
+import { getMountedBlockTabIds, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
 
 describe("getMountedBlockTabIds", () => {
     it("always keeps the root tab mounted", () => {
@@ -29,5 +29,35 @@ describe("getMountedBlockTabIds", () => {
             ROOT_TAB_ID,
             "child-1",
         ]);
+    });
+});
+
+describe("resolveBlockTabViewModel", () => {
+    it("uses the root view model for the root tab without waiting", () => {
+        const rootViewModel = { id: "root" };
+
+        expect(resolveBlockTabViewModel(ROOT_TAB_ID, rootViewModel, () => null)).toEqual({
+            viewModel: rootViewModel,
+            isPending: false,
+        });
+    });
+
+    it("temporarily falls back to the root view model while a child view model is not registered yet", () => {
+        const rootViewModel = { id: "root" };
+
+        expect(resolveBlockTabViewModel("child-1", rootViewModel, () => null)).toEqual({
+            viewModel: rootViewModel,
+            isPending: true,
+        });
+    });
+
+    it("switches to the child view model as soon as it becomes available", () => {
+        const rootViewModel = { id: "root" };
+        const childViewModel = { id: "child-1" };
+
+        expect(resolveBlockTabViewModel("child-1", rootViewModel, () => childViewModel)).toEqual({
+            viewModel: childViewModel,
+            isPending: false,
+        });
     });
 });

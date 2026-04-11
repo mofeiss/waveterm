@@ -21,6 +21,7 @@ export type BlockEnv = WaveEnvSubset<{
     atoms: {
         modalOpen: WaveEnv["atoms"]["modalOpen"];
         controlShiftDelayAtom: WaveEnv["atoms"]["controlShiftDelayAtom"];
+        blockComponentModelVersion: WaveEnv["atoms"]["blockComponentModelVersion"];
     };
     electron: {
         openExternal: WaveEnv["electron"]["openExternal"];

@@ -185,6 +185,7 @@ function makeMockGlobalAtoms(
         updaterStatusAtom: atom("up-to-date" as UpdaterStatus) as any,
         modalOpen: atom(false) as any,
         allConnStatus: atom([] as ConnStatus[]),
+        blockComponentModelVersion: atom(0) as any,
         reinitVersion: atom(0) as any,
         waveAIRateLimitInfoAtom: atom(null) as any,
     };

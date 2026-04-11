@@ -3,6 +3,7 @@
 
 import { BlockNodeModel } from "@/app/block/blocktypes";
 import { Search, useSearch } from "@/app/element/search";
+import { getLatestBlockTabTraceId, logBlockTabExtra } from "@/app/debug/block-tab-trace";
 import { globalStore } from "@/app/store/jotaiStore";
 import { clearActiveZoomBlockId, getSimpleControlShiftAtom, setActiveZoomBlockId } from "@/app/store/keymodel";
 import type { TabModel } from "@/app/store/tab-model";
@@ -15,7 +16,7 @@ import {
 } from "@/app/suggestion/suggestion";
 import { MockBoundary } from "@/app/waveenv/mockboundary";
 import { useWaveEnv } from "@/app/waveenv/waveenv";
-import { openLink } from "@/store/global";
+import { getApi, openLink } from "@/store/global";
 import { adaptFromReactOrNativeKeyEvent, checkKeyPressed } from "@/util/keyutil";
 import { getEnv } from "@/util/getenv";
 import { WaveDevViteVarName } from "@/util/isdev";
@@ -57,6 +58,35 @@ function getWebviewPreloadUrl(env: WebViewEnv) {
         return null;
     }
     return "file://" + webviewPreloadUrl;
+}
+
+function findBlockTabElementUnderCursor(): HTMLElement | null {
+    try {
+        const cursorPoint = getApi().getCursorPoint();
+        const target = document.elementFromPoint(cursorPoint.x, cursorPoint.y);
+        if (!(target instanceof HTMLElement)) {
+            logBlockTabExtra("webview.blur.replay.elementFromPoint-non-html", {
+                cursorX: cursorPoint.x,
+                cursorY: cursorPoint.y,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
+            return null;
+        }
+        const blockTabElem = target.closest(".block-frame-tab") as HTMLElement | null;
+        logBlockTabExtra("webview.blur.replay.elementFromPoint", {
+            cursorX: cursorPoint.x,
+            cursorY: cursorPoint.y,
+            targetTag: target.tagName,
+            targetClassName: target.className,
+            foundBlockTab: blockTabElem != null,
+            blockTabTitle: blockTabElem?.getAttribute("title") ?? null,
+            latestTraceId: getLatestBlockTabTraceId(),
+        });
+        return blockTabElem;
+    } catch (e) {
+        console.warn("Failed to resolve cursor target while replaying webview blur click", e);
+        return null;
+    }
 }
 
 export class WebViewModel implements ViewModel {
@@ -981,6 +1011,23 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
     const domReady = useAtomValue(model.domReady);
 
     const [errorText, setErrorText] = useState("");
+    const blurReplayFrameRef = useRef<number | null>(null);
+    const blurPointerPassthroughTimeoutRef = useRef<number | null>(null);
+
+    const clearWebviewPointerPassthrough = useCallback(() => {
+        if (blurPointerPassthroughTimeoutRef.current != null) {
+            clearTimeout(blurPointerPassthroughTimeoutRef.current);
+            blurPointerPassthroughTimeoutRef.current = null;
+        }
+        const webview = model.webviewRef.current;
+        if (webview != null && webview.style.pointerEvents === "none") {
+            webview.style.pointerEvents = "";
+            logBlockTabExtra("webview.blur.pointer-passthrough.cleared", {
+                blockId: model.blockId,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
+        }
+    }, [model.blockId]);
 
     function setBgColor() {
         const webview = model.webviewRef.current;
@@ -1008,9 +1055,14 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
 
     useEffect(() => {
         return () => {
+            if (blurReplayFrameRef.current != null) {
+                cancelAnimationFrame(blurReplayFrameRef.current);
+                blurReplayFrameRef.current = null;
+            }
+            clearWebviewPointerPassthrough();
             globalStore.set(model.domReady, false);
         };
-    }, []);
+    }, [clearWebviewPointerPassthrough]);
 
     useEffect(() => {
         if (model.webviewRef.current == null || !domReady) {
@@ -1067,6 +1119,12 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
             return;
         }
         const syncWebviewPanelFocus = (focusNativeWebview: boolean) => {
+            logBlockTabExtra("webview.syncWebviewPanelFocus", {
+                blockId: model.blockId,
+                focusNativeWebview,
+                domActiveElementTag: document.activeElement?.tagName ?? null,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
             try {
                 const webContentsId = webview.getWebContentsId?.();
                 if (webContentsId != null) {
@@ -1115,22 +1173,79 @@ const WebView = memo(({ model, onFailLoad, blockRef, initialSrc }: WebViewProps)
                 }
             }
         };
-        const webviewFocus = () => syncWebviewPanelFocus(false);
+        const webviewFocus = () => {
+            clearWebviewPointerPassthrough();
+            logBlockTabExtra("webview.focus", {
+                blockId: model.blockId,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
+            syncWebviewPanelFocus(false);
+        };
         const webviewBlur = () => {
+            logBlockTabExtra("webview.blur", {
+                blockId: model.blockId,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
             env.electron.setWebviewFocus(null, null);
             clearActiveZoomBlockId(model.blockId);
+            if (blurReplayFrameRef.current != null) {
+                cancelAnimationFrame(blurReplayFrameRef.current);
+            }
+            clearWebviewPointerPassthrough();
+            webview.style.pointerEvents = "none";
+            logBlockTabExtra("webview.blur.pointer-passthrough.enabled", {
+                blockId: model.blockId,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
+            blurPointerPassthroughTimeoutRef.current = window.setTimeout(() => {
+                blurPointerPassthroughTimeoutRef.current = null;
+                clearWebviewPointerPassthrough();
+            }, 150);
+            // Electron webviews can consume the first click used to leave the native surface.
+            // If the pointer is currently over a block sub-tab, replay that click onto the host DOM.
+            blurReplayFrameRef.current = requestAnimationFrame(() => {
+                blurReplayFrameRef.current = null;
+                const blockTabElem = findBlockTabElementUnderCursor();
+                if (blockTabElem == null) {
+                    logBlockTabExtra("webview.blur.replay.no-block-tab-under-cursor", {
+                        blockId: model.blockId,
+                        latestTraceId: getLatestBlockTabTraceId(),
+                    });
+                    return;
+                }
+                logBlockTabExtra("webview.blur.replay.click-block-tab", {
+                    blockId: model.blockId,
+                    replayTargetTitle: blockTabElem.getAttribute("title") ?? null,
+                    latestTraceId: getLatestBlockTabTraceId(),
+                });
+                blockTabElem.click();
+            });
         };
-        const webviewPointerDown = () => syncWebviewPanelFocus(true);
+        const webviewPointerDown = () => {
+            logBlockTabExtra("webview.pointerdown", {
+                blockId: model.blockId,
+                latestTraceId: getLatestBlockTabTraceId(),
+            });
+            syncWebviewPanelFocus(true);
+        };
         const webviewIpcMessage = (event: any) => {
             if (event.channel !== "wave-webview-interaction") {
                 return;
             }
             const interactionType = event.args?.[0]?.type;
             if (interactionType === "pointerdown") {
+                logBlockTabExtra("webview.ipc.pointerdown", {
+                    blockId: model.blockId,
+                    latestTraceId: getLatestBlockTabTraceId(),
+                });
                 syncWebviewPanelFocus(true);
                 return;
             }
             if (interactionType === "focusin") {
+                logBlockTabExtra("webview.ipc.focusin", {
+                    blockId: model.blockId,
+                    latestTraceId: getLatestBlockTabTraceId(),
+                });
                 syncWebviewPanelFocus(false);
             }
         };

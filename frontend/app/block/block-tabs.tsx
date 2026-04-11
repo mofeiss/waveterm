@@ -14,8 +14,9 @@ import type { LayoutTreeReplaceNodeAction } from "@/layout/lib/types";
 import { makeIconClass } from "@/util/util";
 import * as jotai from "jotai";
 import * as React from "react";
+import { BlockTabTrace, endBlockTabTrace, logBlockTabTrace, startBlockTabTrace } from "../debug/block-tab-trace";
 import { BlockEnv } from "./blockenv";
-import { getMountedBlockTabIds, ROOT_TAB_ID } from "./block-tabs-util";
+import { getMountedBlockTabIds, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
 import { BlockNodeModel } from "./blocktypes";
 const BLOCK_TABS_IDS_METAKEY = "blocktabs:ids";
 const BLOCK_TABS_ACTIVE_METAKEY = "blocktabs:activeid";
@@ -86,7 +87,7 @@ type BlockHeaderTabProps = {
     targetBlockId: string;
     active: boolean;
     canClose: boolean;
-    onSelect: () => void;
+    onSelect: (trace?: BlockTabTrace) => void;
     onClose?: () => void;
     onRename: (newName: string) => void;
 };
@@ -101,6 +102,7 @@ const BlockHeaderTab = React.memo(
         const editableRef = React.useRef<HTMLDivElement>(null);
         const renameTimeoutRef = React.useRef<NodeJS.Timeout>(null);
         const selectedOnMouseDownRef = React.useRef(false);
+        const clickTraceRef = React.useRef<BlockTabTrace | null>(null);
 
         React.useEffect(() => {
             setOriginalName(title);
@@ -208,28 +210,48 @@ const BlockHeaderTab = React.memo(
         const handleMouseDown = React.useCallback(
             (e: React.MouseEvent<HTMLDivElement>) => {
                 selectedOnMouseDownRef.current = false;
-                e.stopPropagation();
                 if (e.button !== 0) {
                     return;
                 }
+                const trace = startBlockTabTrace("block-header-tab.mousedown", {
+                    targetBlockId,
+                    active,
+                    canClose,
+                    title,
+                });
+                clickTraceRef.current = trace;
+                // Keep this interaction inside the block-tab controller instead of letting the browser
+                // blur/refocus the active webview first, which can swallow the initial tab switch click.
+                e.preventDefault();
+                e.stopPropagation();
+                logBlockTabTrace(trace, "mousedown prevented default and propagation");
                 if (!active) {
-                    onSelect();
+                    logBlockTabTrace(trace, "inactive tab -> invoking onSelect from mousedown");
+                    onSelect(trace);
                     selectedOnMouseDownRef.current = true;
                     return;
                 }
+                logBlockTabTrace(trace, "active tab -> clearPanelFocus");
                 clearPanelFocus();
+                endBlockTabTrace(trace, "active-tab-clear-focus");
             },
-            [active, onSelect]
+            [active, canClose, onSelect, targetBlockId, title]
         );
 
         const handleClick = React.useCallback(
             (e: React.MouseEvent<HTMLDivElement>) => {
                 e.stopPropagation();
+                const trace = clickTraceRef.current;
+                logBlockTabTrace(trace, "click handler entered", {
+                    selectedOnMouseDown: selectedOnMouseDownRef.current,
+                });
                 if (selectedOnMouseDownRef.current) {
                     selectedOnMouseDownRef.current = false;
+                    logBlockTabTrace(trace, "click ignored because selection already handled on mousedown");
                     return;
                 }
-                onSelect();
+                logBlockTabTrace(trace, "click invoking onSelect");
+                onSelect(trace ?? undefined);
             },
             [onSelect]
         );
@@ -237,7 +259,6 @@ const BlockHeaderTab = React.memo(
         return (
             <div
                 className={`block-frame-tab ${active ? "active" : ""} ${canClose ? "closable" : "fixed-tab"}`}
-                data-clear-panel-focus="true"
                 onMouseDown={handleMouseDown}
                 onClick={handleClick}
                 onContextMenu={handleContextMenu}
@@ -262,13 +283,13 @@ const BlockHeaderTab = React.memo(
                     <button
                         type="button"
                         className="block-frame-tab-close"
-                        data-clear-panel-focus="true"
                         title="Close Tab"
                         onClick={(e) => {
                             e.stopPropagation();
                             onClose?.();
                         }}
                         onMouseDown={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                         }}
                     >
@@ -285,7 +306,7 @@ type BlockHeaderTabsProps = {
     parentBlockId: string;
     childTabIds: string[];
     activeTabId: string;
-    onSelectTab: (tabId: string) => void;
+    onSelectTab: (tabId: string, trace?: BlockTabTrace) => void;
     onCloseTab: (tabId: string) => void;
     onRenameTab: (tabId: string, newName: string) => void;
 };
@@ -298,7 +319,7 @@ const BlockHeaderTabs = React.memo(
                     targetBlockId={parentBlockId}
                     active={activeTabId === ROOT_TAB_ID}
                     canClose={childTabIds.length > 0}
-                    onSelect={() => onSelectTab(ROOT_TAB_ID)}
+                    onSelect={(trace) => onSelectTab(ROOT_TAB_ID, trace)}
                     onClose={() => onCloseTab(ROOT_TAB_ID)}
                     onRename={(newName) => onRenameTab(ROOT_TAB_ID, newName)}
                 />
@@ -308,7 +329,7 @@ const BlockHeaderTabs = React.memo(
                         targetBlockId={childId}
                         active={activeTabId === childId}
                         canClose={true}
-                        onSelect={() => onSelectTab(childId)}
+                        onSelect={(trace) => onSelectTab(childId, trace)}
                         onClose={() => onCloseTab(childId)}
                         onRename={(newName) => onRenameTab(childId, newName)}
                     />
@@ -362,7 +383,7 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
     const showAddTabButton = supportsBlockTabs(rootBlockData?.meta?.view) || hasTabs;
     const childTabIdsRef = React.useRef<string[]>(childTabIds);
     const activeTabIdRef = React.useRef(activeTabId);
-    const [childViewModelRefreshSeq, setChildViewModelRefreshSeq] = React.useState(0);
+    const blockComponentModelVersion = jotai.useAtomValue(waveEnv.atoms.blockComponentModelVersion);
     const [mountedTabIds, setMountedTabIds] = React.useState<string[]>(() =>
         getMountedBlockTabIds([ROOT_TAB_ID], activeTabId, childTabIds)
     );
@@ -375,16 +396,6 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
     React.useEffect(() => {
         setMountedTabIds((prevMountedIds) => getMountedBlockTabIds(prevMountedIds, activeTabId, childTabIds));
     }, [activeTabId, childTabIds]);
-
-    React.useEffect(() => {
-        if (activeTabId === ROOT_TAB_ID) {
-            return;
-        }
-        const raf = requestAnimationFrame(() => {
-            setChildViewModelRefreshSeq((v) => v + 1);
-        });
-        return () => cancelAnimationFrame(raf);
-    }, [activeTabId]);
 
     const persistTabs = React.useCallback(
         async (nextChildIds: string[], nextActiveTabId: string) => {
@@ -485,15 +496,43 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
     }, [blockId]);
 
     const selectTab = React.useCallback(
-        (nextTabId: string) => {
+        (nextTabId: string, trace?: BlockTabTrace) => {
             const nextActive = nextTabId === ROOT_TAB_ID ? ROOT_TAB_ID : nextTabId;
+            logBlockTabTrace(trace, "selectTab entered", {
+                blockId,
+                nextTabId,
+                nextActive,
+                currentActiveTabId: activeTabIdRef.current,
+            });
             if (nextActive === activeTabIdRef.current) {
+                logBlockTabTrace(trace, "selectTab no-op because target already active");
                 setTimeout(() => refocusNode(blockId), 10);
+                endBlockTabTrace(trace, "selectTab-noop-already-active", { refocusBlockId: blockId });
                 return;
             }
-            void persistTabs(childTabIdsRef.current, nextActive).then(() => {
-                setTimeout(() => refocusNode(blockId), 10);
+            logBlockTabTrace(trace, "persistTabs begin", {
+                childTabIds: childTabIdsRef.current,
             });
+            void persistTabs(childTabIdsRef.current, nextActive)
+                .then(() => {
+                    logBlockTabTrace(trace, "persistTabs resolved", {
+                        persistedActiveTabId: nextActive,
+                    });
+                    setTimeout(() => {
+                        logBlockTabTrace(trace, "refocusNode timeout fired", { refocusBlockId: blockId });
+                        refocusNode(blockId);
+                        endBlockTabTrace(trace, "selectTab-success", {
+                            refocusBlockId: blockId,
+                            persistedActiveTabId: nextActive,
+                        });
+                    }, 10);
+                })
+                .catch((error) => {
+                    endBlockTabTrace(trace, "selectTab-error", {
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                    throw error;
+                });
         },
         [blockId, persistTabs]
     );
@@ -567,14 +606,14 @@ function useBlockTabs({ blockId, nodeModel, rootViewModel, rootContent }: UseBlo
         await Promise.allSettled(ids.map((id) => RpcApi.DeleteSubBlockCommand(TabRpcClient, { blockid: id })));
     }, [persistTabs]);
 
-    const activeViewModel = React.useMemo(() => {
-        if (activeTabId === ROOT_TAB_ID) {
-            return rootViewModel;
-        }
-        void childViewModelRefreshSeq;
-        const bcm = getBlockComponentModel(activeTabId);
-        return bcm?.getActiveViewModel?.() ?? bcm?.viewModel ?? rootViewModel;
-    }, [activeTabId, childViewModelRefreshSeq, rootViewModel]);
+    const activeViewModel = React.useMemo(
+        () =>
+            resolveBlockTabViewModel(activeTabId, rootViewModel, (tabId) => {
+                const bcm = getBlockComponentModel(tabId);
+                return bcm?.getActiveViewModel?.() ?? bcm?.viewModel;
+            }).viewModel,
+        [activeTabId, blockComponentModelVersion, rootViewModel]
+    );
 
     const tabContents = (
         <>
