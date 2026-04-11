@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { getMountedBlockTabIds, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
+import { getMountedBlockTabIds, moveBlockTabId, resolveBlockTabViewModel, ROOT_TAB_ID } from "./block-tabs-util";
 
 describe("getMountedBlockTabIds", () => {
     it("always keeps the root tab mounted", () => {
@@ -59,5 +59,21 @@ describe("resolveBlockTabViewModel", () => {
             viewModel: childViewModel,
             isPending: false,
         });
+    });
+});
+
+describe("moveBlockTabId", () => {
+    it("moves a child tab to the requested index", () => {
+        expect(moveBlockTabId(["a", "b", "c"], "a", 2)).toEqual(["b", "c", "a"]);
+    });
+
+    it("returns the original order when the tab is already at the target index", () => {
+        const tabIds = ["a", "b", "c"];
+        expect(moveBlockTabId(tabIds, "b", 1)).toEqual(tabIds);
+    });
+
+    it("ignores unknown tab ids", () => {
+        const tabIds = ["a", "b", "c"];
+        expect(moveBlockTabId(tabIds, "missing", 1)).toEqual(tabIds);
     });
 });

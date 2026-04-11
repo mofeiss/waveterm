@@ -63,26 +63,30 @@ function getWebviewPreloadUrl(env: WebViewEnv) {
 function findBlockTabElementUnderCursor(): HTMLElement | null {
     try {
         const cursorPoint = getApi().getCursorPoint();
-        const target = document.elementFromPoint(cursorPoint.x, cursorPoint.y);
-        if (!(target instanceof HTMLElement)) {
-            logBlockTabExtra("webview.blur.replay.elementFromPoint-non-html", {
+        const sampleOffsets = [0, -8, -16, -24, -32, -40];
+        for (const offsetY of sampleOffsets) {
+            const sampleY = Math.max(0, cursorPoint.y + offsetY);
+            const elements = document.elementsFromPoint(cursorPoint.x, sampleY);
+            const blockTabElem = elements.find(
+                (elem): elem is HTMLElement => elem instanceof HTMLElement && elem.closest(".block-frame-tab") != null
+            );
+            const matchedBlockTab = blockTabElem?.closest(".block-frame-tab") as HTMLElement | null;
+            logBlockTabExtra("webview.blur.replay.elementFromPoint", {
                 cursorX: cursorPoint.x,
                 cursorY: cursorPoint.y,
+                sampleY,
+                offsetY,
+                topElementTag: elements[0]?.tagName ?? null,
+                topElementClassName: elements[0] instanceof HTMLElement ? elements[0].className : null,
+                foundBlockTab: matchedBlockTab != null,
+                blockTabTitle: matchedBlockTab?.getAttribute("title") ?? null,
                 latestTraceId: getLatestBlockTabTraceId(),
             });
-            return null;
+            if (matchedBlockTab != null) {
+                return matchedBlockTab;
+            }
         }
-        const blockTabElem = target.closest(".block-frame-tab") as HTMLElement | null;
-        logBlockTabExtra("webview.blur.replay.elementFromPoint", {
-            cursorX: cursorPoint.x,
-            cursorY: cursorPoint.y,
-            targetTag: target.tagName,
-            targetClassName: target.className,
-            foundBlockTab: blockTabElem != null,
-            blockTabTitle: blockTabElem?.getAttribute("title") ?? null,
-            latestTraceId: getLatestBlockTabTraceId(),
-        });
-        return blockTabElem;
+        return null;
     } catch (e) {
         console.warn("Failed to resolve cursor target while replaying webview blur click", e);
         return null;

@@ -299,6 +299,11 @@
                             background: var(--highlight-bg-color);
                         }
 
+                        &[data-block-tab-dragging="true"] {
+                            opacity: 0.55;
+                            cursor: grabbing;
+                        }
+
                         &.active {
                             opacity: 1;
                             background: var(--highlight-bg-color);

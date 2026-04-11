@@ -15,7 +15,7 @@ let latestBlockTabTraceId: number | null = null;
 function emitBlockTabTraceLog(message: string) {
     console.log(message);
     try {
-        window.api?.sendLog?.(message);
+        (window as any).api?.sendLog?.(message);
     } catch (_) {}
 }
 

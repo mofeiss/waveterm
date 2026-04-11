@@ -30,4 +30,19 @@ function resolveBlockTabViewModel<T>(
     return { viewModel: childViewModel, isPending: false };
 }
 
-export { ROOT_TAB_ID, getMountedBlockTabIds, resolveBlockTabViewModel };
+function moveBlockTabId(tabIds: string[], draggedTabId: string, targetIndex: number): string[] {
+    const fromIndex = tabIds.indexOf(draggedTabId);
+    if (fromIndex === -1) {
+        return tabIds;
+    }
+    const boundedTargetIndex = Math.max(0, Math.min(targetIndex, tabIds.length - 1));
+    if (fromIndex === boundedTargetIndex) {
+        return tabIds;
+    }
+    const nextTabIds = [...tabIds];
+    nextTabIds.splice(fromIndex, 1);
+    nextTabIds.splice(boundedTargetIndex, 0, draggedTabId);
+    return nextTabIds;
+}
+
+export { ROOT_TAB_ID, getMountedBlockTabIds, moveBlockTabId, resolveBlockTabViewModel };
